@@ -1,3 +1,4 @@
+#[cfg(feature = "cuda")]
 pub mod cuda {
     pub mod ops {
         pub mod gpu_matrix_ops;

@@ -1,4 +1,4 @@
-use ctensor::tensor_view::{TensorDType, TensorView};
+use ctensor::tensor_view::TensorView;
 use anyhow::Result;
 use crate::cpu::ops::{
     cpu_matmul::matmul, 

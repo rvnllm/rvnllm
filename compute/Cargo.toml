@@ -12,6 +12,10 @@ links = "llrs_compute"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = []
+cuda = []
+
 [dependencies]
 libc = "0.2.172"
 tracing-subscriber = "0.3.18"

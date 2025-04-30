@@ -17,6 +17,15 @@ Work in progress. Currently focused on:
 - End-to-end token-to-logit pass
 - Core ops: matmul, softmax, norm, activation
 
+## Build
+```
+make                  # Debug build (no CUDA)
+make cuda             # Debug build with CUDA
+make release          # Release build (no CUDA)
+make cuda-release     # Release build with CUDA
+make test             # Run tests (default features)
+```
+
 ## License
 
 MIT

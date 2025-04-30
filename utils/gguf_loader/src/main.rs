@@ -1,6 +1,6 @@
 mod types;
 
-use ctensor::tensor_view::{TensorView, Tensor, TensorDType};
+use ctensor::tensor_view::Tensor;
 use std::fs::File;
 use std::io::{Cursor, Read};
 use memmap2::Mmap;
@@ -14,7 +14,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 struct GgufHeader {
     magic: u32,
-    version: u32,
+    //version: u32, --->>> maybe later, just v3 for now
     tensor_count: u64,
     metadata_kv_count: u64,
 }
@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
     // Step 2: Parse GGUF header
     let header = GgufHeader {
         magic: cursor.read_u32::<LittleEndian>()?,
-        version: cursor.read_u32::<LittleEndian>()?,
+        //version: cursor.read_u32::<LittleEndian>()?,
         tensor_count: cursor.read_u64::<LittleEndian>()?,
         metadata_kv_count: cursor.read_u64::<LittleEndian>()?,
     };
@@ -72,10 +72,10 @@ fn main() -> anyhow::Result<()> {
     //println!("[DEBUG] GGUF metadata length: {:#?}", header.metadata_kv_count);
     // Step 4: Read metadata key-value pairs
     for _i in 0..header.metadata_kv_count {
-        let key = read_string(&mut cursor)?;
+        let _key = read_string(&mut cursor)?;
         let val_type: MetadataValueType = cursor.read_u32::<LittleEndian>()?.try_into()?;
     //    let val = read_metadata_val(&mut cursor);
-        let val = match val_type {
+        let _val = match val_type {
             MetadataValueType::Uint8 => Value::from(cursor.read_u8()?),
             MetadataValueType::Int8 => Value::from(cursor.read_i8()?),
             MetadataValueType::Uint16 => Value::from(cursor.read_u16::<LittleEndian>()?),
@@ -220,11 +220,11 @@ fn read_string(cursor: &mut Cursor<&[u8]>) -> Result<String> {
 }
 
 
-fn read_metadata_val(cursor: &mut Cursor<&[u8]>) -> anyhow::Result<()> {
-    let val_type = cursor.read_u8()?;
+//fn read_metadata_val(cursor: &mut Cursor<&[u8]>) -> anyhow::Result<()> {
+//    let val_type = cursor.read_u8()?;
     //match val_type {
 
     //}
 
-    Ok(())
-}
+//    Ok(())
+//}
