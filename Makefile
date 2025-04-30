@@ -11,6 +11,10 @@ all: build
 build:
 	$(CARGO) build --features "$(FEATURES)"
 
+.PHONY: clean
+clean:
+	$(CARGO) clean
+
 .PHONY: release
 release:
 	$(CARGO) build --release --features "$(FEATURES)"

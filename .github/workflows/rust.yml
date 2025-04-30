@@ -1,13 +1,10 @@
-name: Rust CI
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
-
-env:
-  CARGO_TERM_COLOR: always
+    branches: ["main"]
 
 jobs:
   build:
@@ -16,17 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache cargo registry
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+      - name: Install Make and Dependencies
+        run: sudo apt-get update && sudo apt-get install -y make
 
-      - name: Build
-        run: cargo build --workspace --verbose
+      - name: Build (Debug)
+        run: make debug
 
-      - name: Run tests
-        run: cargo test --workspace --verbose
+      - name: Test
+        run: make test
+
