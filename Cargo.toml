@@ -10,10 +10,10 @@ resolver = "3"
 
 [workspace.package]
 version = "0.0.1"
-authors = ["Ervin Bosenbacher <ervin.bosenbacher@thirdrule.io>"]
+authors = ["Ervin Bosenbacher <ervin.bosenbacher@rvnllm.com>"]
 edition = "2024"
 homepage = "https://www.rvnllm.com/"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/rvnllm/rvnllm"
 
 [workspace.dependencies]

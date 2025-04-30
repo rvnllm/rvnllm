@@ -31,5 +31,7 @@ make test             # Run tests (default features)
 
 ## License
 
-MIT
+This project is licensed under either of:
 
+- [MIT License](LICENSE-MIT)
+- [Apache License, Version 2.0](LICENSE-APACHE)
