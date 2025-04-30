@@ -1,6 +1,6 @@
-![CI](https://github.com/rvnllm/rvnllm/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/rvnllm/rvnllm/actions/workflows/ci.yaml/badge.svg)
 
-
+      
 # rvnllm
 
 **rvnllm** is a lightweight, modular LLM (Large Language Model) engine focused on performance, clarity, and adaptability. Built in Rust, it aims to provide a clean, traceable implementation of inference for transformer-based models.
