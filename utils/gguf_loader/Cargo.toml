@@ -1,0 +1,17 @@
+[package]
+name = "gguf_loader"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+memmap2 = "0.9.5"
+byteorder = "1.5"
+anyhow = "1.0.98"
+log = "0.4.20"
+serde = { version = "1.0.194", features = ["derive"] }
+serde_json = { version = "1.0.110", features = ["arbitrary_precision"] }
+ctensor = { path = "../../ctensor" }

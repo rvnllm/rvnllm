@@ -1,0 +1,45 @@
+[workspace]
+members = [ 
+    "compute", 
+    "ctensor",
+    "rvnllm",
+    "utils/gguf_loader",
+]
+
+resolver = "3"
+
+[workspace.package]
+version = "0.0.1"
+authors = ["Ervin Bosenbacher <ervin.bosenbacher@thirdrule.io>"]
+edition = "2024"
+homepage = "https://www.rvnllm.com/"
+license = "MIT"
+repository = "https://github.com/rvnllm/rvnllm"
+
+[workspace.dependencies]
+clap = { version = "4.5.37", features = ["derive"] }
+anyhow = "1.0.98"
+log = "0.4.27"
+env_logger = "0.11.8"
+tokio = { version = "1.44.2", features = ["full"] }
+tracing-subscriber = "0.3.19"
+
+[profile.mindebug-dev]
+inherits = "dev"
+
+[profile.release]
+lto = "thin"
+
+[profile.nodebug-release]
+inherits = "release"
+debug = false
+
+[profile.debug-release]
+inherits = "release"
+debug = true
+
+[profile.dist-release]
+inherits = "release"
+codegen-units = 1
+debug = false
+lto = "fat"
