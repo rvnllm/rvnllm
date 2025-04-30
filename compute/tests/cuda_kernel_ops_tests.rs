@@ -1,7 +1,9 @@
 
+#[cfg(feature = "cuda")]
 use compute::cuda::ops::gpu_matrix_ops::gpu_matrix_multiply;
 
 #[test]
+#[cfg(feature = "cuda")]
 fn test_cuda_matrix_mul() {
     //CUDA
     let m = 2;
