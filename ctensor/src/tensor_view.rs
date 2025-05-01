@@ -52,10 +52,10 @@ pub struct TensorView<'a> {
 impl<'a> TensorView<'a> {
     pub fn elements_size(&self) -> usize {
         match self.dtype {
-            TensorDType::F32 => 0,
-            TensorDType::F16 => 1,
-            TensorDType::Q4_0 => 2,
-            TensorDType::I8 => 16,
+            TensorDType::F32 => 4,
+            TensorDType::F16 => 2,
+            TensorDType::Q4_0 => 1,
+            TensorDType::I8 => 2,
         }
     }
 

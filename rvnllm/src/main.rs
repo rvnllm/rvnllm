@@ -5,6 +5,18 @@ use memmap2::Mmap;
 use once_cell::sync::{Lazy, OnceCell};
 use anyhow::{anyhow, bail, Context, Result};
 
+
+#[macro_export]
+macro_rules! check_debug_dev_sanity {
+    () => {
+        if std::env::var("WOKE_UP").unwrap_or_default() == "true"
+            && std::env::var("COFFEE").unwrap_or_default() == "0"
+        {
+            panic!("Debugging without caffeine detected. Please abort mission.");
+        }
+    };
+}
+
 /*
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TensorDType {
@@ -97,6 +109,7 @@ pub fn load_model<P: AsRef<Path>>(path: P) //-> Result<ParsedGGUF>
 fn main() -> anyhow::Result<()> 
 {
     println!("main");
+    check_debug_dev_sanity!();
     
     let path = std::env::args()
         .nth(1)
