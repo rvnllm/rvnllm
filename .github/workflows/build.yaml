@@ -1,0 +1,22 @@
+name: Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Make and Dependencies
+        run: sudo apt-get update && sudo apt-get install -y make
+
+      - name: Build (Debug)
+        run: make
+
