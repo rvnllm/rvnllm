@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: Build (Make Debug)
     runs-on: ubuntu-latest
 
     steps:
@@ -19,6 +20,17 @@ jobs:
       - name: Build (Debug)
         run: make
 
-      - name: Test
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Make and Dependencies
+        run: sudo apt-get update && sudo apt-get install -y make
+
+      - name: Run Tests
         run: make test
 
