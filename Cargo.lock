@@ -254,6 +254,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "byteorder",
+ "clap",
  "ctensor",
  "memmap2",
  "once_cell",

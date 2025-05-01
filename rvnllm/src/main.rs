@@ -1,10 +1,13 @@
+mod cli_commands;
+
 use std::{collections::HashMap, fs::File, hash::Hash};
 use std::path::Path;
 use ctensor::tensor_view::{TensorView, TensorDType};
 use memmap2::Mmap;
 use once_cell::sync::{Lazy, OnceCell};
 use anyhow::{anyhow, bail, Context, Result};
-
+use cli_commands::{RvnCli, Command, ValidationProfile};
+use clap::Parser;
 
 #[macro_export]
 macro_rules! check_debug_dev_sanity {
@@ -110,6 +113,8 @@ fn main() -> anyhow::Result<()>
 {
     println!("main");
     check_debug_dev_sanity!();
+
+    let cli = RvnCli::parse();
     
     let path = std::env::args()
         .nth(1)
