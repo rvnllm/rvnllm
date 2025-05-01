@@ -1,4 +1,5 @@
-![CI](https://github.com/rvnllm/rvnllm/actions/workflows/ci.yaml/badge.svg?branch=main)
+![Build](https://github.com/rvnllm/rvnllm/actions/workflows/build.yaml/badge.svg?branch=main)
+![Test](https://github.com/rvnllm/rvnllm/actions/workflows/test.yaml/badge.svg?branch=main)
 
       
 # rvnllm
