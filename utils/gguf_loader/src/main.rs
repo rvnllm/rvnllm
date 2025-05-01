@@ -56,6 +56,7 @@ fn main() -> anyhow::Result<()> {
         Mmap::map(&file)?
     };
     let mut cursor = Cursor::new(&mmap[..]);
+    println!("-->>>>  cursor: {:#?}", cursor);
     
     // Step 2: Parse GGUF header
     let header = GgufHeader {
