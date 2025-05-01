@@ -11,10 +11,11 @@ use serde_json::Value;
 use anyhow::anyhow;
 use std::collections::HashMap;
 
+
 #[derive(Debug)]
 struct GgufHeader {
     magic: u32,
-    //version: u32, --->>> maybe later, just v3 for now
+    version: u32, //--->>> maybe later, just v3 for now
     tensor_count: u64,
     metadata_kv_count: u64,
 }
@@ -45,7 +46,10 @@ Repeat until generation stops (full loop)
 // 10	Benchmarks
 
 
+
+
 fn main() -> anyhow::Result<()> {
+
     // Step 1: Open and mmap the file
     let file = File::open("../models/llama-2-13b-ensemble-v5.Q6_K.gguf")?;
     let mmap = unsafe {
@@ -56,7 +60,7 @@ fn main() -> anyhow::Result<()> {
     // Step 2: Parse GGUF header
     let header = GgufHeader {
         magic: cursor.read_u32::<LittleEndian>()?,
-        //version: cursor.read_u32::<LittleEndian>()?,
+        version: cursor.read_u32::<LittleEndian>()?,
         tensor_count: cursor.read_u64::<LittleEndian>()?,
         metadata_kv_count: cursor.read_u64::<LittleEndian>()?,
     };
