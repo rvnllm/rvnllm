@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::cpu::ops::{
     cpu_matmul::matmul, 
     cpu_softmax::softmax};
-
+use log::debug;
 //[input]  
 //   │
 //   ├──> (1) Linear projection → Q (query)  
@@ -119,6 +119,7 @@ pub fn attention_forward(
 ) -> Result<()> {
     // 1. q @ k.T => [1, n_tokens] attention_scores
     let mut attn_scores = vec![0.0f32; k.shape[0]]; // n_tokens
+    debug!("attention scores (pre-softmax): {:?}", attn_scores);
     let k_t = TensorView {
         data: k.data,
         shape: vec![k.shape[1], k.shape[0]], // transpose: 

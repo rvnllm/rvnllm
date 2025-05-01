@@ -36,8 +36,23 @@ impl Tensor {
 pub enum TensorDType {
     F32, //0
     F16,  //1
-    Q4_0, //2
-    I8, // 16
+    I8, // 1
+    // Packed quant types—all addressable in 1 byte.
+    Q4_0,
+    Q4_1,
+    Q5_0,
+    Q5_1,
+    Q8_0,
+    Q8_1,
+    Q2_K,
+    Q3_K_S,
+    Q3_K_M,
+    Q3_K_L,
+    Q4_K_S,
+    Q4_K_M,
+    Q5_K_S,
+    Q5_K_M,
+    Q6_K
 }
 
 
@@ -49,13 +64,51 @@ pub struct TensorView<'a> {
     pub dtype: TensorDType,     // How to interpret bytes
 }
 
+pub trait AsRawQuant {
+    fn as_bytes(&self) -> anyhow::Result<&[u8]>;
+}
+
+macro_rules! impl_quant_view {
+    ($fn_name:ident, $variant:ident) => {
+        pub fn $fn_name(&self) -> anyhow::Result<&[u8]> {
+            if self.dtype != TensorDType::$variant {
+                anyhow::bail!("[TensorView] not {}", stringify!($variant));
+            }
+            if self.expected_byte_len() != self.data.len() {
+                println!("[DEBUG] expected: {:#?}  data: {:#?}", self.expected_byte_len(), self.data.len());
+                anyhow::bail!("[TensorView] length mismatch for {}", stringify!($variant));
+            }
+            Ok(self.data)
+        }
+    };
+}
+
 impl<'a> TensorView<'a> {
     pub fn elements_size(&self) -> usize {
         match self.dtype {
-            TensorDType::F32 => 4,
-            TensorDType::F16 => 2,
-            TensorDType::Q4_0 => 1,
-            TensorDType::I8 => 2,
+            TensorDType::F32       => 4,
+            TensorDType::F16       => 2,
+            TensorDType::I8        => 1,
+
+            // Packed quant types—all addressable in 1 byte.
+            TensorDType::Q4_0   |
+            TensorDType::Q4_1   |
+            TensorDType::Q5_0   |
+            TensorDType::Q5_1   |
+            TensorDType::Q8_0   |
+            TensorDType::Q8_1   |
+            TensorDType::Q2_K   |
+            TensorDType::Q3_K_S |
+            TensorDType::Q3_K_M |
+            TensorDType::Q3_K_L |
+            TensorDType::Q4_K_S |
+            TensorDType::Q4_K_M |
+            TensorDType::Q5_K_S |
+            TensorDType::Q5_K_M |
+            TensorDType::Q6_K     => 1,
+
+            // In case you add new types later
+            _ => panic!("Unsupported TensorDType: {:?}", self.dtype),
         }
     }
 
@@ -93,5 +146,20 @@ impl<'a> TensorView<'a> {
         }
     }
 
+    impl_quant_view!(as_q4_0_slice, Q4_0);
+    impl_quant_view!(as_q4_1_slice, Q4_1);
+    impl_quant_view!(as_q5_0_slice, Q5_0);
+    impl_quant_view!(as_q5_1_slice, Q5_1);
+    impl_quant_view!(as_q8_0_slice, Q8_0);
+    impl_quant_view!(as_q8_1_slice, Q8_1);
+    impl_quant_view!(as_q2_k_slice, Q2_K);
+    impl_quant_view!(as_q3_k_s_slice, Q3_K_S);
+    impl_quant_view!(as_q3_k_m_slice, Q3_K_M);
+    impl_quant_view!(as_q3_k_l_slice, Q3_K_L);
+    impl_quant_view!(as_q4_k_s_slice, Q4_K_S);
+    impl_quant_view!(as_q4_k_m_slice, Q4_K_M);
+    impl_quant_view!(as_q5_k_s_slice, Q5_K_S);
+    impl_quant_view!(as_q5_k_m_slice, Q5_K_M);
+    impl_quant_view!(as_q6_k_slice, Q6_K);
 }
 

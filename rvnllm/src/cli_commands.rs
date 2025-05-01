@@ -1,4 +1,11 @@
 use clap::{Parser, Subcommand, Args, ValueEnum};
+use std::collections::HashMap;
+use std::io::Cursor;
+use std::path::PathBuf;
+use anyhow::{Result, bail};
+use memmap2::Mmap;
+use once_cell::sync::Lazy;
+use byteorder::{LittleEndian, ReadBytesExt};
 
 #[derive(Parser)]
 #[command(
@@ -21,16 +28,15 @@ pub struct RvnCli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// View model metadata, headers, tensor info
     Info(InfoCommand),
 
-    /// List available tensors
     List {
         #[arg(short, long)]
         file: String,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
-    /// Dump the content of a tensor
     Dump {
         #[arg(short, long)]
         file: String,
@@ -38,26 +44,28 @@ pub enum Command {
         name: String,
         #[arg(long, default_value = "shape")]
         format: DumpFormat,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
-    /// Run a forward pass with optional options
     Forward(ForwardArgs),
 
-    /// Compare tensors between two models
     Diff {
         #[arg(short = 'a', long)]
         file_a: String,
         #[arg(short = 'b', long)]
         file_b: String,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
-    /// Analyze structure and estimate usage
     Analyze {
         #[arg(short, long)]
         file: String,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
-    /// Profile model performance
     Profile {
         #[arg(short, long)]
         file: String,
@@ -67,61 +75,52 @@ pub enum Command {
         tokens: usize,
         #[arg(long, default_value = "none")]
         cache_mode: CacheMode,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
-    /// Validate GGUF file integrity and structure
     Validate {
         #[arg(short, long)]
         file: String,
-
-        /// Validation profile: choose how strict to be
         #[arg(long, default_value = "llama")]
         profile: ValidationProfile,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
-    /// Inspect and audit model integrity, shape, and suspicious patterns
+
     Watch {
         #[arg(short, long)]
         file: String,
-
-        /// Validation profile: how deep to scan
         #[arg(long, default_value = "llama")]
         profile: WatchProfile,
-
-        /// Enable single-token dummy forward pass
         #[arg(long)]
         dummy_forward: bool,
-
-        /// Enable tokenizer/token ID mapping inspection
         #[arg(long)]
         check_tokenizer: bool,
-
-        /// Enable entropy & output distribution analysis
         #[arg(long)]
         check_entropy: bool,
-
-        /// Enable scan for known suspicious trigger phrases
         #[arg(long)]
         scan_triggers: bool,
-
-        /// Dump suspicious findings even if no hard errors
         #[arg(long)]
         verbose: bool,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
     WatchPerf {
         #[arg(short, long)]
         file: String,
-
         #[arg(short, long)]
         input: String,
-
         #[arg(long, value_delimiter = ',')]
         metrics: Vec<PerfMetric>,
-
+        #[arg(long)]
+        preset: Option<PerfPreset>,
         #[arg(long, default_value = "cpu")]
         device: Device,
-    }
-    
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Args)]
@@ -134,6 +133,8 @@ pub struct InfoCommand {
     pub metadata: bool,
     #[arg(long)]
     pub tensor: Option<String>,
+    #[arg(long)]
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Args)]
@@ -152,6 +153,12 @@ pub struct ForwardArgs {
     pub stream: bool,
     #[arg(long)]
     pub personality: Option<String>,
+    #[arg(long, default_value = "text")]
+    pub output_format: OutputFormat,
+    #[arg(long)]
+    pub dump_activations: bool,
+    #[arg(long)]
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -169,6 +176,13 @@ pub enum DumpFormat {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum OutputFormat {
+    Text,
+    Json,
+    Logits,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum CacheMode {
     None,
     Kv,
@@ -177,25 +191,15 @@ pub enum CacheMode {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum ValidationProfile {
-    /// Basic GGUF format validation (header, tensors, metadata)
     Llama,
-
-    /// Also checks expected tensor shapes and presence
     Strict,
-
-    /// Includes quantization sanity, offset boundaries, entropy heuristics
     Paranoid,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum WatchProfile {
-    /// Basic GGUF format validation (header, tensors, metadata)
     Llama,
-
-    /// Expected tensor structure, shape sanity, dtype checks
     Strict,
-
-    /// Entropy, offset boundaries, forward simulation, tokenizer analysis
     Paranoid,
 }
 
@@ -210,3 +214,11 @@ pub enum PerfMetric {
     Memory,
     Entropy,
 }
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum PerfPreset {
+    Minimal,
+    Deep,
+    Debug,
+}
+
