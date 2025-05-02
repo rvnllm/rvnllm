@@ -1,3 +1,0 @@
-main
-[DEBUG] path: "../models/llama-2-13b-ensemble-v5.Q6_K.gguf"
-metadata: 19
