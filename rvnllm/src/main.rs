@@ -672,6 +672,7 @@ impl GgufParser for ParserV2 {
 
         let metadata = parse_metadata_common(cursor, metadata_kv_count)?;
         let tensors = parse_tensors_common(cursor,tensor_count)?;
+        // parse V2 tensor descriptors into `tensors`
     
         Ok(GgufBody {
             header: Header { tensor_count, metadata_kv_count },
@@ -865,6 +866,30 @@ pub fn resolve_tensor_slice<'a>(view: &'a TensorView) -> Result<&'a [u8]> {
     }
 }
 
+pub fn project_qkv(
+    gguf: &ParsedGGUF,
+    q: &str,
+    k: &str,
+    v: &str,
+) -> Result<(Vec<f32>, Vec<f32>, Vec<f32>, usize, usize)> {
+    let q_tensor = gguf.tensor(q).ok_or_else(|| anyhow!("Missing tensor: {}", q))?;
+    let k_tensor = gguf.tensor(k).ok_or_else(|| anyhow!("Missing tensor: {}", k))?;
+    let v_tensor = gguf.tensor(v).ok_or_else(|| anyhow!("Missing tensor: {}", v))?;
+
+    let d_k = q_tensor.shape[1] as usize;
+    let n_tokens = k_tensor.shape[0] as usize;
+    let d_v = v_tensor.shape[1] as usize;
+
+    let qv_all = gguf.tensor_view(q)?.as_f32_slice()?;
+    let kv = gguf.tensor_view(k)?.as_f32_slice()?.to_vec();
+    let vv = gguf.tensor_view(v)?.as_f32_slice()?.to_vec();
+
+    // ✅ Take just the first row of Q
+    let qv = qv_all[0..d_k].to_vec();
+
+    Ok((qv, kv, vv, d_k, d_v))
+}
+
 fn main() -> anyhow::Result<()> 
 {
     env_logger::init();
@@ -885,12 +910,12 @@ fn main() -> anyhow::Result<()>
 
         Command::ForwardSimple { file, q, k, v } => {
             let gguf = load_model(&file)?;
-            let qv = gguf.tensor_view(&q)?.as_f32_slice()?.to_vec();
-            let kv = gguf.tensor_view(&k)?.as_f32_slice()?.to_vec();
-            let vv = gguf.tensor_view(&v)?.as_f32_slice()?.to_vec();
+             let (qv, kv, vv, d_k, d_v) = project_qkv(&gguf, &q, &k, &v)?;
+            let n_tokens = kv.len() / d_k;
+            debug!("qv.len(): {}, kv.len(): {}, vv.len(): {}", qv.len(), kv.len(), vv.len());
 
             let d_k = qv.len();
-            let n_tokens = kv.len() / d_k;
+            //let n_tokens = kv.len() / d_k;
             let mut scores = vec![0.0f32; n_tokens];
             for i in 0..n_tokens {
                 let start = i * d_k;
@@ -906,7 +931,12 @@ fn main() -> anyhow::Result<()>
             let sum: f32 = scores.iter_mut().map(|s| {*s = (*s - max).exp(); *s}).sum();
             for s in &mut scores { *s /= sum; }
 
-            let d_v = vv.len() / n_tokens;
+            if n_tokens == 0 {
+                bail!("Invalid input: zero tokens inferred. Check K tensor shape.");
+            }
+            let d_v = vv.len() / n_tokens; 
+            debug!("d_k: {}, n_tokens: {}, d_v: {}", d_k, n_tokens, d_v);   
+
             let mut output = vec![0.0f32; d_v];
             for i in 0..n_tokens {
                 for j in 0..d_v {
@@ -1212,3 +1242,5 @@ fn main() -> anyhow::Result<()>
 
 // Improper block size assumptions
 // → maybe Q4_K_S uses 128 or 256-value blocks, not 64?
+//
+//
