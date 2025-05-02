@@ -6,6 +6,8 @@ use anyhow::{Result, bail};
 use memmap2::Mmap;
 use once_cell::sync::Lazy;
 use byteorder::{LittleEndian, ReadBytesExt};
+use serde_json::json;
+
 
 #[derive(Parser)]
 #[command(
@@ -13,13 +15,32 @@ use byteorder::{LittleEndian, ReadBytesExt};
     version = env!("CARGO_PKG_VERSION"),
     about = "High-performance GGUF loader. Load, inspect, validate, and run models fast.",
     after_help = r#"
+USAGE:
+    rvnllm <COMMAND> [OPTIONS]
+
+COMMANDS:
+    info             View model metadata, headers, or tensor info
+    dump             Dump tensor contents (supports multiple formats)
+    forward          Execute full forward pass (WIP)
+    forward-simple   Run attention-only forward pass for inspection
+    decode-test      Decode a tensor and check for anomalies
+    diff             Compare two models' tensor sets
+    validate         Run structural integrity checks on GGUF files
+    analyze          Analyze tensor structures and usage heuristics
+    profile          Measure model performance (CPU/CUDA)
+    watch            Inspect and audit model for suspicious patterns
+    watch-perf       Run forward pass and collect performance metrics
+
+OPTIONS:
+    -h, --help        Show this help message
+    -V, --version     Show version info
+
 EXAMPLES:
-  rvnllm info header --file llama2.gguf
-  rvnllm list tensors --file llama2.gguf
-  rvnllm dump tensor --file llama2.gguf --name blk.0.attn_q.weight --format f32
-  rvnllm forward --file llama2.gguf --input "The raven is" --device cuda
-  rvnllm validate --file llama2.gguf --profile paranoid
-"#
+    rvnllm info --file llama2.gguf --header
+    rvnllm list --file llama2.gguf
+    rvnllm decode-test --file llama2.gguf --name blk.0.attn_q.weight
+    rvnllm forward-simple --file llama2.gguf --q ... --k ... --v ...
+    "#
 )]
 pub struct RvnCli {
     #[command(subcommand)]
@@ -28,8 +49,10 @@ pub struct RvnCli {
 
 #[derive(Subcommand)]
 pub enum Command {
+
     Info(InfoCommand),
 
+    #[command(about = "List all tensor names and shapes")]
     List {
         #[arg(short, long)]
         file: String,
@@ -37,6 +60,7 @@ pub enum Command {
         output: Option<PathBuf>,
     },
 
+    #[command(about = "Dump tensor contents (supports multiple formats)")]
     Dump {
         #[arg(short, long)]
         file: String,
@@ -48,8 +72,21 @@ pub enum Command {
         output: Option<PathBuf>,
     },
 
+    #[command(about = "Run attention-only forward pass for inspection (Note: qunatization under development only f32 for now.")]
+    ForwardSimple {
+        #[arg(short, long)]
+        file: String,
+        #[arg(long)]
+        q: String,
+        #[arg(long)]
+        k: String,
+        #[arg(long)]
+        v: String,
+    },
+
     Forward(ForwardArgs),
 
+    #[command(about = "Compare two models' tensor sets")]
     Diff {
         #[arg(short = 'a', long)]
         file_a: String,
@@ -59,6 +96,31 @@ pub enum Command {
         output: Option<PathBuf>,
     },
 
+    #[command(about = "Decode a tensor and check for anomalies")]
+    DecodeTest {
+        #[arg(short, long)]
+        file: String,
+        #[arg(short, long)]
+        name: String,
+        #[arg(long, default_value_t = false)]
+        verbose: bool,
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        #[arg(long, default_value_t = false)]
+        fail_on_anomaly: bool,
+    },
+
+    #[command(about = "Full internal structure is dumped, a ParsedGGUF structure with header, metadata and tensors")]
+    Debug {
+        #[arg(short, long)]
+        file: String,
+        #[arg(long)]
+        threads: Option<usize>,
+        #[arg(long)]
+        output: Option<String>,
+    },   
+
+    #[command(about = "Analyze tensor structures and usage heuristics. (Note: under development)")]
     Analyze {
         #[arg(short, long)]
         file: String,
@@ -66,6 +128,7 @@ pub enum Command {
         output: Option<PathBuf>,
     },
 
+    #[command(about = "Analyze tensor structures and usage heuristics. (Note: under development)")]
     Profile {
         #[arg(short, long)]
         file: String,
@@ -78,6 +141,7 @@ pub enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+
 
     Validate {
         #[arg(short, long)]
@@ -106,6 +170,8 @@ pub enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+
+
 
     WatchPerf {
         #[arg(short, long)]

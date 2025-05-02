@@ -13,7 +13,13 @@ use clap::Parser;
 use log::debug;
 use std::io::{Cursor, Read};
 use std::fmt::Display;
-
+use crate::cli_commands::DumpFormat;
+use serde_json::json;
+use clap::CommandFactory;
+use rayon::iter::ParallelBridge;
+use rayon::iter::ParallelIterator;
+use std::io::{BufWriter, Write};
+ use rayon::iter::IntoParallelRefIterator;
 
 #[macro_export]
 macro_rules! check_debug_dev_sanity {
@@ -535,6 +541,9 @@ impl ParsedGGUF {
             .view(&self.mmap[..])
     }
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Tensor)> { self.tensors.iter() }
+    pub fn raw_bytes(&self) -> &[u8] {
+        &self.mmap[..]
+    }
 }
 
 static PARSER_REGISTRY: Lazy<Vec<Box<dyn GgufParser>>> = Lazy::new(|| {
@@ -564,15 +573,19 @@ trait GgufParser: Send + Sync {
 struct ParserV3;
 impl GgufParser for ParserV3 {
     fn version(&self) -> GgufVersion { GgufVersion::V3 } // todo: move this an enum, no hardcoded magic symbols
+
     fn parse<'b>(&self, cursor: &mut Cursor<&'b [u8]>) -> Result<GgufBody> {
         let tensor_count = cursor.read_u64::<LittleEndian>()?;
-        debug!("tensor_count: {:#?}", tensor_count);
+        debug!("tensor_count: {}", tensor_count);
+        let metadata_kv_count = cursor.read_u64::<LittleEndian>()?;
+        debug!("metadata_kv_count: {}", metadata_kv_count);
 
-        Ok(
-            GgufBody {
-                header: Header {
-                tensor_count: 0,
-                metadata_kv_count: 0,
+        // Stub: you'll want to implement proper metadata and tensor reading here too,
+        // but this now correctly sets the header at least.
+        Ok(GgufBody {
+            header: Header {
+                tensor_count,
+                metadata_kv_count,
             },
             metadata: HashMap::new(),
             tensors: HashMap::new(),
@@ -638,6 +651,9 @@ fn read_value(cursor: &mut Cursor<&[u8]>) -> Result<Value> {
     Ok(val)
 }
 
+////
+
+
 struct ParserV2;
 impl GgufParser for ParserV2 {
     fn version(&self) -> GgufVersion { 
@@ -656,7 +672,7 @@ impl GgufParser for ParserV2 {
             metadata.insert(key, val);
         }
 
-        println!("metadata: {:#?}", metadata.len());
+        //println!("metadata: {:#?}", metadata.len());
 
         // parse V2 tensor descriptors into `tensors`
         let mut tensors: HashMap<String, Tensor> = HashMap::new();
@@ -837,30 +853,261 @@ pub fn resolve_tensor_slice<'a>(view: &'a TensorView) -> Result<&'a [u8]> {
     }
 }
 
-
-use compute::cpu::ops::{
-    cpu_matmul::matmul,
-    cpu_add::add,
-    cpu_softmax::softmax,
-    cpu_rmsnorm::rmsnorm,
-};
-use compute::cpu::ops::cpu_attention::attention_forward;
 fn main() -> anyhow::Result<()> 
 {
     env_logger::init();
-    
     println!("main");
     check_debug_dev_sanity!();
 
-    //let cli = RvnCli::parse();
+
+    let cli = RvnCli::parse();
+
+    match cli.command {
+        Command::List { file, .. } => {
+            let gguf = load_model(&file)?;
+            println!("Tensor count: {}", gguf.tensors.len());
+            for (name, tensor) in &gguf.tensors {
+                println!("{} => shape: {:?}", name, tensor.shape);
+            }
+        }
+
+        Command::ForwardSimple { file, q, k, v } => {
+            let gguf = load_model(&file)?;
+            let qv = gguf.tensor_view(&q)?.as_f32_slice()?.to_vec();
+            let kv = gguf.tensor_view(&k)?.as_f32_slice()?.to_vec();
+            let vv = gguf.tensor_view(&v)?.as_f32_slice()?.to_vec();
+
+            let d_k = qv.len();
+            let n_tokens = kv.len() / d_k;
+            let mut scores = vec![0.0f32; n_tokens];
+            for i in 0..n_tokens {
+                let start = i * d_k;
+                let end = start + d_k;
+                scores[i] = qv.iter()
+                    .zip(&kv[start..end])
+                    .map(|(a, b)| a * b)
+                    .sum::<f32>();
+            }
+            let scale = 1.0 / (d_k as f32).sqrt();
+            for s in &mut scores { *s *= scale; }
+            let max = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            let sum: f32 = scores.iter_mut().map(|s| {*s = (*s - max).exp(); *s}).sum();
+            for s in &mut scores { *s /= sum; }
+
+            let d_v = vv.len() / n_tokens;
+            let mut output = vec![0.0f32; d_v];
+            for i in 0..n_tokens {
+                for j in 0..d_v {
+                    output[j] += scores[i] * vv[i * d_v + j];
+                }
+            }
+            println!("Attention output: {:?}", &output[..output.len().min(10)]);
+        }
+        
+        Command::Info(cmd) => {
+            let gguf = load_model(&cmd.file)?;
+            if cmd.header {
+                println!("Header: {:?}", gguf.header);
+            }
+            if cmd.metadata {
+                println!("Metadata:");
+                for (k, v) in gguf.metadata() {
+                    if let Some(key) = k.strip_prefix("tokenizer") {
+                        debug!("[VERBOSE] tokenizer metadata: {} => {:?}", key, v);
+                        continue;
+                    }
+
+                    match v {
+                        Value::String(s) => println!("  {}: \"{}\"", k, s),
+                        Value::Uint32(n) => println!("  {}: {}", k, n),
+                        Value::Float32(f) => println!("  {}: {:.6}", k, f),
+                        _ => println!("  {}: {:?}", k, v),
+                    }
+                }
+
+            }
+            if let Some(name) = cmd.tensor {
+                if let Some(tensor) = gguf.tensor(&name) {
+                    println!("Tensor '{}': shape = {:?}, kind = {}", name, tensor.shape, tensor.kind);
+                } else {
+                    eprintln!("Tensor '{}' not found", name);
+                }
+            }
+        }
+
+        Command::Dump { file, name, format, .. } => {
+            let gguf = load_model(&file)?;
+            let view = gguf.tensor_view(&name)?;
+            match format {
+                DumpFormat::Shape => {
+                    println!("Shape: {:?}", view.shape);
+                }
+                DumpFormat::F32 => {
+                    let f32s = view.as_f32_slice()?;
+                    println!("{:?}", &f32s[..f32s.len().min(10)]);
+                }
+                DumpFormat::Raw => {
+                    println!("Raw bytes: {:?}", &view.data[..view.data.len().min(10)]);
+                }
+                DumpFormat::Json => {
+                    println!("{{ \"shape\": {:?} }}", view.shape);
+                }
+            }
+        }
+
+        Command::Analyze { file, .. } => {
+            let gguf = load_model(&file)?;
+            println!("Tensors: {}", gguf.tensors.len());
+            let total_bytes: u64 = gguf.tensors.values().map(|t| t.size).sum();
+            println!("Total tensor size: {} bytes", total_bytes);
+        }
+
+        Command::Validate { file, profile, .. } => {
+            let gguf = load_model(&file)?;
+            println!("Validating '{}' with profile {:?}" , file, profile);
+            // Placeholder: real validation logic
+            println!("OK (stub) — no issues found.");
+        }
+
+        // Placeholder: remaining commands to be implemented
+        Command::Forward(_) => {
+            println!("[TODO] Forward pass not implemented yet");
+        }
+
+        Command::Diff { file_a, file_b, .. } => {
+            println!("[TODO] Diff '{}' vs '{}' not implemented yet", file_a, file_b);
+        }
+
+        Command::Profile { file, .. } => {
+            println!("[TODO] Profile not implemented yet for file: {}", file);
+        }
+
+        Command::Watch { file, .. } => {
+            println!("[TODO] Watch not implemented yet for file: {}", file);
+        }
+
+        Command::WatchPerf { file, .. } => {
+            println!("[TODO] WatchPerf not implemented yet for file: {}", file);
+        }
+ 
+        Command::Debug { file, threads, output } => {
+            if let Some(n) = threads {
+                let _ = rayon::ThreadPoolBuilder::new()
+                    .num_threads(n)
+                    .build_global();
+            }
+            let gguf = load_model(&file)?;
+            let mut entries: Vec<_> = gguf.iter().collect();
+            entries.sort_by_key(|(_, t)| t.offset);
+
+            let mut writer: Box<dyn Write + Send> = match output {
+                Some(path) => Box::new(BufWriter::new(File::create(path)?)),
+                None => Box::new(std::io::stdout()),
+            };
+
+            writeln!(writer, "==[ GGUF Dump ]==")?;
+
+            let results: Vec<String> = entries.par_iter().map(|(name, tensor)| {
+                let mut buf = String::new();
+                use std::fmt::Write as _;
+                writeln!(buf, "  [{}]:", name).ok();
+                writeln!(buf, "    kind: {}", tensor.kind).ok();
+                writeln!(buf, "    offset: {}", tensor.offset).ok();
+                writeln!(buf, "    size: {}", tensor.size).ok();
+                writeln!(buf, "    shape: {:?}", tensor.shape).ok();
+
+                if tensor.size < 1024 * 4 {
+                    if let Ok(view) = tensor.view(gguf.raw_bytes()) {
+                        if view.dtype == TensorDType::F32 {
+                            if let Ok(slice) = view.as_f32_slice() {
+                                let preview: Vec<_> = slice.iter().take(10).cloned().collect();
+                                writeln!(buf, "    preview: {:?}", preview).ok();
+                            }
+                        }
+                    }
+                }
+                buf
+            }).collect();
+
+            for line in results {
+                writer.write_all(line.as_bytes())?;
+            }
+            writer.flush()?;
+        }
+        Command::DecodeTest { file, name, verbose, json, fail_on_anomaly } => {
+            let gguf = load_model(&file)?;
+            let view = gguf.tensor_view(&name)?;
+            let f32s = view.as_f32_slice()?;
+
+            let (nan_count, inf_count, zeros, min, max, sum) = f32s.iter().fold(
+                (0, 0, 0, f32::MAX, f32::MIN, 0.0f64),
+                |(n, i, z, min, max, sum), &val| {
+                    (
+                        n + val.is_nan() as usize,
+                        i + (val.is_infinite() as usize),
+                        z + (val == 0.0) as usize,
+                        if val.is_nan() { min } else { val.min(min) },
+                        if val.is_nan() { max } else { val.max(max) },
+                        if val.is_finite() { sum + val as f64 } else { sum }
+                    )
+                },
+            );
+
+            let mean = sum / f32s.len() as f64;
+
+            if json {
+                let out = json!({
+                    "tensor": name,
+                    "shape": view.shape,
+                    "dtype": format!("{:?}", view.dtype),
+                    "nan": nan_count,
+                    "inf": inf_count,
+                    "zeros": zeros,
+                    "min": min,
+                    "max": max,
+                    "mean": mean,
+                    "preview": &f32s[..f32s.len().min(10)]
+                });
+                println!("{}", out);
+            } else {
+                println!("Tensor '{}': shape: {:?}, dtype: {:?}", name, view.shape, view.dtype);
+                println!("Element count: {}", view.num_elements());
+                println!("Byte length: {} (expected {})", view.data.len(), view.expected_byte_len());
+
+                if view.expected_byte_len() != view.data.len() {
+                    println!("[WARN] Byte length mismatch");
+                }
+
+                if nan_count > 0 || inf_count > 0 {
+                    println!("[ERROR] Tensor contains {} NaN and {} Inf values", nan_count, inf_count);
+                } else {
+                    println!("[OK] No NaN or Inf values found");
+                }
+
+                println!("Zero values: {} ({:.2}%)", zeros, (zeros as f64 / f32s.len() as f64) * 100.0);
+                println!("Min: {:.6}, Max: {:.6}, Mean: {:.6}", min, max, mean);
+                println!("Preview: {:?}", &f32s[..f32s.len().min(if verbose { 20 } else { 10 })]);
+            }
+
+            if fail_on_anomaly && (nan_count > 0 || inf_count > 0) {
+                std::process::exit(1);
+            }
+
+        }
+    }
+
+    Ok(())
+}
+
+//let cli = RvnCli::parse();
     
-    let path = std::env::args()
-        .nth(1)
-        .expect("usage: rvnllm <path/to/model.gguf>");
-    println!("[DEBUG] path: {:#?}", path);
+//    let path = std::env::args()
+  //      .nth(1)
+    //    .expect("usage: rvnllm <path/to/model.gguf>");
+//    println!("[DEBUG] path: {:#?}", path);
     
     //let _file = File::open("../model/llama-2-13b-ensemble-v5.Q6_K.gguf")?;
-    let gguf  = load_model(&path)?;
+  //  let gguf  = load_model(&path)?;
 
     //pub struct ParsedGGUF {
     // public 
@@ -874,22 +1121,22 @@ fn main() -> anyhow::Result<()>
 //    for (key, tensor) in &gguf.tensors {
   //      println!("{} => shape: {:?}", key, tensor.shape);
    // }
-    let q_weights = collect_tensors_by_suffix(&gguf.tensors, "attn_q.weight");
-    let ffns = collect_tensors_by_suffix(&gguf.tensors, "ffn_norm.weight");
+  //  let q_weights = collect_tensors_by_suffix(&gguf.tensors, "attn_q.weight");
+    //let ffns = collect_tensors_by_suffix(&gguf.tensors, "ffn_norm.weight");
 
     //for (name, tensor) in q_weights {
     //    println!("Found Q: {} => {:?}", name, tensor.shape);
     //}
-    let q_view = gguf.tensor_view("blk.0.attn_q.weight")?;
-    let k_view = gguf.tensor_view("blk.0.attn_k.weight")?;
-    let v_view = gguf.tensor_view("blk.0.attn_v.weight")?;
+ //   let q_view = gguf.tensor_view("blk.0.attn_q.weight")?;
+   // let k_view = gguf.tensor_view("blk.0.attn_k.weight")?;
+   // let v_view = gguf.tensor_view("blk.0.attn_v.weight")?;
     
-    let q_view_slice = resolve_tensor_slice(&q_view)?;
+  //  let q_view_slice = resolve_tensor_slice(&q_view)?;
 
-    let d_model = q_view.shape[0];
+    //let d_model = q_view.shape[0];
 //    let input = vec![1.0f32; d_model]; // mock input, can be random or fixed
-    let input = vec![1.0f32 / (d_model as f32).sqrt(); d_model];
-    let input_view = TensorView {
+   // let input = vec![1.0f32 / (d_model as f32).sqrt(); d_model];
+  /*  let input_view = TensorView {
         data: unsafe {
             std::slice::from_raw_parts(input.as_ptr() as *const u8, d_model * 4)
         },
@@ -934,10 +1181,9 @@ fn main() -> anyhow::Result<()>
     println!("output {:#?}", &output[..10]);
     
 
-    //println!("[DEBUG] gguf: {:#?}", gguf);
+    //println!("[DEBUG] gguf: {:#?}", gguf);*/
 
-    Ok(())
-}
+
 
 // recap
 // Tensor data length mismnatch issue
