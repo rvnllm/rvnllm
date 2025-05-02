@@ -566,6 +566,69 @@ struct GgufBody {
     pub tensors: HashMap<String, Tensor>,
 }
 
+////
+pub fn parse_metadata_common(cursor: &mut Cursor<&[u8]>, metadata_kv_count: u64) -> Result<HashMap<String, Value>> {
+    let mut metadata = HashMap::new();
+    for _ in 0..metadata_kv_count {
+        let key = read_string(cursor)?;
+        let val = read_value(cursor)?;
+        //debug!("key: {:#?} {:#?}", key, val);
+        metadata.insert(key, val);
+    }
+    Ok(metadata)
+}
+
+pub fn parse_tensors_common(cursor: &mut Cursor<&[u8]>, tensor_count: u64) -> Result<HashMap<String, Tensor>> {
+    let mut tensors: HashMap<String, Tensor> = HashMap::new();
+    for _ in 0..tensor_count {
+    
+        // 1) name
+        let name = read_string(cursor)?;
+    
+        // 2) dims and shape
+        let dims = cursor.read_u32::<LittleEndian>()? as usize;
+        let mut shape = Vec::with_capacity(dims);
+        for _ in 0..dims {
+            shape.push(cursor.read_u64::<LittleEndian>()?);
+        }
+    
+        // 3) kind, offset
+        let kind = cursor.read_u32::<LittleEndian>()?;
+        let offset = cursor.read_u64::<LittleEndian>()?;
+    
+        // 4) infer type size via GGMLType or block_size logic
+        let block_size = match kind {
+            k if k < 2 => 1,
+            k if k < 10 => 32,
+            _ => 256,
+        };
+        let ggml_type: GGMLType = kind.try_into()?;
+        let type_size = match ggml_type {
+            GGMLType::F32 => 4,
+            GGMLType::F16 => 2,
+            GGMLType::Q4_0 => 2 + block_size/2,
+            GGMLType::Q4_1 => 2 + 2 + block_size/2,
+            GGMLType::Q5_0 => 2 + 4 + block_size/2,
+            GGMLType::Q5_1 => 2 + 2 + 4 + block_size/2,
+            GGMLType::Q8_0 => 2 + block_size,
+            GGMLType::Q8_1 => 4 + 4 + block_size,
+            GGMLType::Q2K => block_size/16 + block_size/4 + 2 + 2,
+            GGMLType::Q3K => block_size/8 + block_size/4 + 12 + 2,
+            GGMLType::Q4K => 2 + 2 + 12 + block_size/2,
+            GGMLType::Q5K => 2 + 2 + 12 + block_size/8 + block_size/2,
+            GGMLType::Q6K => block_size/2 + block_size/4 + block_size/16 + 2,
+            _ => return Err(anyhow!("unsupported GGMLType {:?}", ggml_type)),
+        };
+        let parameters: u64 = shape.iter().product();
+        let size = parameters * type_size as u64 / block_size as u64;
+        let tensor = Tensor { name: name.clone(), kind, offset, size, shape };
+        debug!("[DEBUG] tensors hell yeah: {:#?}", tensor);
+
+        tensors.insert(name, tensor);
+    }
+    Ok(tensors)
+}
+
 trait GgufParser: Send + Sync {
     fn version(&self) -> GgufVersion;
     fn parse<'b>(&self, cur: &mut Cursor<&'b [u8]>)-> Result<GgufBody>;
@@ -578,20 +641,46 @@ impl GgufParser for ParserV3 {
         let tensor_count = cursor.read_u64::<LittleEndian>()?;
         debug!("tensor_count: {}", tensor_count);
         let metadata_kv_count = cursor.read_u64::<LittleEndian>()?;
-        debug!("metadata_kv_count: {}", metadata_kv_count);
+        debug!("metadata_kv_count: {:#?}", metadata_kv_count);
 
-        // Stub: you'll want to implement proper metadata and tensor reading here too,
-        // but this now correctly sets the header at least.
+        let metadata = parse_metadata_common(cursor, metadata_kv_count)?;
+        let tensors = parse_tensors_common(cursor,tensor_count)?;
+ 
         Ok(GgufBody {
             header: Header {
                 tensor_count,
                 metadata_kv_count,
             },
-            metadata: HashMap::new(),
-            tensors: HashMap::new(),
+            metadata,
+            tensors,
         })
     }
 }
+
+
+
+struct ParserV2;
+impl GgufParser for ParserV2 {
+    fn version(&self) -> GgufVersion { 
+        GgufVersion::V2
+    } // todo: move this an enum, no hardcoded magic symbols
+    fn parse<'b>(&self, cursor: &mut Cursor<&'b [u8]>) -> Result<GgufBody> {
+        let tensor_count = cursor.read_u64::<LittleEndian>()?;
+        debug!("tensor_count: {:#?}", tensor_count);
+        let metadata_kv_count = cursor.read_u64::<LittleEndian>()?;
+        debug!("metadata_kv_count: {:#?}", metadata_kv_count);
+
+        let metadata = parse_metadata_common(cursor, metadata_kv_count)?;
+        let tensors = parse_tensors_common(cursor,tensor_count)?;
+    
+        Ok(GgufBody {
+            header: Header { tensor_count, metadata_kv_count },
+            metadata,
+            tensors,
+        })
+    }
+}
+
 
 /// Read a length-prefixed UTF-8 string (u64 length)
 fn read_string(cursor: &mut Cursor<&[u8]>) -> Result<String> {
@@ -649,83 +738,6 @@ fn read_value(cursor: &mut Cursor<&[u8]>) -> Result<Value> {
     
 
     Ok(val)
-}
-
-////
-
-
-struct ParserV2;
-impl GgufParser for ParserV2 {
-    fn version(&self) -> GgufVersion { 
-        GgufVersion::V2
-    } // todo: move this an enum, no hardcoded magic symbols
-    fn parse<'b>(&self, cursor: &mut Cursor<&'b [u8]>) -> Result<GgufBody> {
-        let tensor_count = cursor.read_u64::<LittleEndian>()?;
-        debug!("tensor_count: {:#?}", tensor_count);
-        let metadata_kv_count = cursor.read_u64::<LittleEndian>()?;
-        debug!("metadata_kv_count: {:#?}", metadata_kv_count);
-        let mut metadata = HashMap::new();
-        for _ in 0..metadata_kv_count {
-            let key = read_string(cursor)?;
-            let val = read_value(cursor)?;
-            //debug!("key: {:#?} {:#?}", key, val);
-            metadata.insert(key, val);
-        }
-
-        //println!("metadata: {:#?}", metadata.len());
-
-        // parse V2 tensor descriptors into `tensors`
-        let mut tensors: HashMap<String, Tensor> = HashMap::new();
-        for _ in 0..tensor_count {
-            // 1) name
-            let name = read_string(cursor)?;
-            // 2) dims and shape
-            let dims = cursor.read_u32::<LittleEndian>()? as usize;
-            let mut shape = Vec::with_capacity(dims);
-            for _ in 0..dims {
-                shape.push(cursor.read_u64::<LittleEndian>()?);
-            }
-            // 3) kind, offset
-            let kind = cursor.read_u32::<LittleEndian>()?;
-            let offset = cursor.read_u64::<LittleEndian>()?;
-            // 4) infer type size via GGMLType or block_size logic
-            let block_size = match kind {
-                k if k < 2 => 1,
-                k if k < 10 => 32,
-                _ => 256,
-            };
-            let ggml_type: GGMLType = kind.try_into()?;
-            let type_size = match ggml_type {
-                GGMLType::F32 => 4,
-                GGMLType::F16 => 2,
-                GGMLType::Q4_0 => 2 + block_size/2,
-                GGMLType::Q4_1 => 2 + 2 + block_size/2,
-                GGMLType::Q5_0 => 2 + 4 + block_size/2,
-                GGMLType::Q5_1 => 2 + 2 + 4 + block_size/2,
-                GGMLType::Q8_0 => 2 + block_size,
-                GGMLType::Q8_1 => 4 + 4 + block_size,
-                GGMLType::Q2K => block_size/16 + block_size/4 + 2 + 2,
-                GGMLType::Q3K => block_size/8 + block_size/4 + 12 + 2,
-                GGMLType::Q4K => 2 + 2 + 12 + block_size/2,
-                GGMLType::Q5K => 2 + 2 + 12 + block_size/8 + block_size/2,
-                GGMLType::Q6K => block_size/2 + block_size/4 + block_size/16 + 2,
-                _ => return Err(anyhow!("unsupported GGMLType {:?}", ggml_type)),
-            };
-            let parameters: u64 = shape.iter().product();
-            let size = parameters * type_size as u64 / block_size as u64;
-            let tensor = Tensor { name: name.clone(), kind, offset, size, shape };
-            debug!("[DEBUG] tensors hell yeah: {:#?}", tensor);
-
-            tensors.insert(name, tensor);
-        }
-
-
-        Ok(GgufBody {
-            header: Header { tensor_count, metadata_kv_count },
-            metadata,
-            tensors,
-        })
-    }
 }
 
 
