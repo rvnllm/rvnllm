@@ -4,7 +4,7 @@
     
 > "In the stories, Raven was a trickster. A transformer. A messenger. So is this."
 
-# 🨶 Raven (`rvn`)
+# Raven (`rvn`)
 A blazing-fast, introspective LLM engine in Rust.
 
 Why the name? In Indigenous mythology, the raven symbolizes:
@@ -17,7 +17,7 @@ Why the name? In Indigenous mythology, the raven symbolizes:
 A fast, adaptive, introspective LLM engine and tools written in Rust.
 
 ---
-⚠️ Note: Work in Progress. Project is under active development and evolving daily. 
+Note: Work in Progress. Project is under active development and evolving daily. 
 
 ## What is `rvn`?
 
