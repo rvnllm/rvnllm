@@ -890,6 +890,28 @@ pub fn project_qkv(
     Ok((qv, kv, vv, d_k, d_v))
 }
 
+fn compat_tensor_dump(gguf: &ParsedGGUF) -> Result<()> {
+    for (idx, (name, tensor)) in gguf.iter().enumerate() {
+        println!(
+            "tensor[{}]: name = {}, size = {}, offset = {}",
+            idx, name, tensor.size, tensor.offset
+        );
+
+        let view = tensor.view(gguf.raw_bytes())?;
+        if view.dtype == TensorDType::F32 {
+            let f32s = view.as_f32_slice()?;
+            let preview: Vec<String> = f32s.iter()
+                .take(10)
+                .map(|v| format!("{:.6}", v))
+                .collect();
+            println!("data[:10] = {}", preview.join(" "));
+        } else {
+            println!("data[:10] = <non-f32 or quantized>");
+        }
+    }
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> 
 {
     env_logger::init();
@@ -1032,7 +1054,7 @@ fn main() -> anyhow::Result<()>
             println!("[TODO] WatchPerf not implemented yet for file: {}", file);
         }
  
-        Command::Debug { file, threads, output } => {
+        Command::Debug { file, threads, output, compat } => {
             if let Some(n) = threads {
                 let _ = rayon::ThreadPoolBuilder::new()
                     .num_threads(n)
@@ -1049,32 +1071,36 @@ fn main() -> anyhow::Result<()>
 
             writeln!(writer, "==[ GGUF Dump ]==")?;
 
-            let results: Vec<String> = entries.par_iter().map(|(name, tensor)| {
-                let mut buf = String::new();
-                use std::fmt::Write as _;
-                writeln!(buf, "  [{}]:", name).ok();
-                writeln!(buf, "    kind: {}", tensor.kind).ok();
-                writeln!(buf, "    offset: {}", tensor.offset).ok();
-                writeln!(buf, "    size: {}", tensor.size).ok();
-                writeln!(buf, "    shape: {:?}", tensor.shape).ok();
+            if compat {
+                compat_tensor_dump(&gguf)?;
+            } else {
+                let results: Vec<String> = entries.par_iter().map(|(name, tensor)| {
+                    let mut buf = String::new();
+                    use std::fmt::Write as _;
+                    writeln!(buf, "  [{}]:", name).ok();
+                    writeln!(buf, "    kind: {}", tensor.kind).ok();
+                    writeln!(buf, "    offset: {}", tensor.offset).ok();
+                    writeln!(buf, "    size: {}", tensor.size).ok();
+                    writeln!(buf, "    shape: {:?}", tensor.shape).ok();
 
-                if tensor.size < 1024 * 4 {
-                    if let Ok(view) = tensor.view(gguf.raw_bytes()) {
-                        if view.dtype == TensorDType::F32 {
-                            if let Ok(slice) = view.as_f32_slice() {
-                                let preview: Vec<_> = slice.iter().take(10).cloned().collect();
-                                writeln!(buf, "    preview: {:?}", preview).ok();
+                    if tensor.size < 1024 * 4 {
+                        if let Ok(view) = tensor.view(gguf.raw_bytes()) {
+                            if view.dtype == TensorDType::F32 {
+                                if let Ok(slice) = view.as_f32_slice() {
+                                    let preview: Vec<_> = slice.iter().take(10).cloned().collect();
+                                    writeln!(buf, "    preview: {:?}", preview).ok();
+                                }
                             }
                         }
                     }
+                    buf
+                }).collect();
+    
+                for line in results {
+                    writer.write_all(line.as_bytes())?;
                 }
-                buf
-            }).collect();
-
-            for line in results {
-                writer.write_all(line.as_bytes())?;
+                writer.flush()?;
             }
-            writer.flush()?;
         }
         Command::DecodeTest { file, name, verbose, json, fail_on_anomaly } => {
             let gguf = load_model(&file)?;

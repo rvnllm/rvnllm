@@ -118,6 +118,8 @@ pub enum Command {
         threads: Option<usize>,
         #[arg(long)]
         output: Option<String>,
+        #[arg(long)]
+        compat: bool, // <-- Add this
     },   
 
     #[command(about = "Analyze tensor structures and usage heuristics. (Note: under development)")]
