@@ -18,7 +18,7 @@ repository = "https://github.com/rvnllm/rvnllm"
 
 [workspace.dependencies]
 clap = { version = "4.5.37", features = ["derive"] }
-anyhow = "1.0.98":
+anyhow = "1.0.98"
 tokio = { version = "1.44.2", features = ["full"] }
 tracing-subscriber = "0.3.19"
 memmap2 = "0.9.5"

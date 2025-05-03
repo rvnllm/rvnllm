@@ -15,12 +15,12 @@ anyhow = { workspace = true }
 memmap2 = { workspace = true }
 byteorder = { workspace = true }
 once_cell = { workspace = true }
-clap = { worksace = true }
+clap = { workspace = true }
 log = { workspace = true }
-env_logger = { workspace = } 
-bytemuck = { } 
-serde = { }
-serde_json = { }
-rayon = { }
+env_logger = { workspace = true } 
+bytemuck = { workspace = true } 
+serde = { workspace = true }
+serde_json = { workspace = true }
+rayon = { workspace = true }
 ctensor = { path = "../ctensor" }
 compute = { path = "../compute" }

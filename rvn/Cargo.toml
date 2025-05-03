@@ -8,3 +8,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+clap = { workspace = true }
+anyhow = { workspace = true }
+env_logger = { workspace = true } 
+serde_json = { workspace = true }
+byteorder = { workspace = true }
+memmap2 = { workspace = true }
+once_cell = { workspace = true }
+#
+rvnllm = { path = "../rvnllm" }
+
