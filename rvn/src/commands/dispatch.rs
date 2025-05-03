@@ -1,7 +1,11 @@
 use crate::cli::{RvnCli, Command };
 //use crate::commands::info;
 //use anyhow::Result;
-use crate::commands::list::run_list;
+use crate::commands::{
+    truncate::run_truncate,
+        list::run_list
+};
+
 
 pub fn dispatch(cli: RvnCli) -> anyhow::Result<()> 
 {
@@ -82,6 +86,11 @@ pub fn dispatch(cli: RvnCli) -> anyhow::Result<()>
             compat: _ } => {   
             println!("[TODO] Debug not implemented yet for file: {}", file);
         }
+
+        Command::Truncate { file, output, layers, verbose } => {
+            run_truncate(file, output, layers, verbose);
+        }
+
         Command::DecodeTest { 
             file, name: _, verbose: _, json: _, fail_on_anomaly: _ } => {    
             println!("[TODO] DecodeTest not implemented yet for file: {}", file);

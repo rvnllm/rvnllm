@@ -10,3 +10,5 @@ pub mod list;
 pub mod watch;
 pub mod validate;
 pub mod analyze;
+pub mod truncate;
+

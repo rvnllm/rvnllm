@@ -496,7 +496,7 @@ fn get_format(kind: u32) -> Option<&'static Box<dyn TensorFormat>> {
     TENSOR_REGISTRY.get().and_then(|m| m.get(&kind))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tensor {
     pub name: String,
     pub kind: u32,

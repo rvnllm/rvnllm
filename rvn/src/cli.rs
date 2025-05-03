@@ -115,6 +115,18 @@ pub enum Command {
         compat: bool, // <-- Add this
     },   
 
+    #[command(about = "Truncate GGUF file for development/testing purposes.")]
+    Truncate {
+        #[arg(long)]
+        file: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, default_value = "1")]
+        layers: usize,
+        #[arg(long, default_value_t = false)]
+        verbose: bool,
+    },
+
     #[command(about = "Analyze tensor structures and usage heuristics. (Note: under development)")]
     Analyze {
         #[arg(short, long)]
