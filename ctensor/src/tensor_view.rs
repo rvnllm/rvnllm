@@ -44,15 +44,15 @@ pub enum TensorDType {
     Q5_1,
     Q8_0,
     Q8_1,
-    Q2_K,
-    Q3_K_S,
-    Q3_K_M,
-    Q3_K_L,
-    Q4_K_S,
-    Q4_K_M,
-    Q5_K_S,
-    Q5_K_M,
-    Q6_K
+    Q2K,
+    Q3KS,
+    Q3KM,
+    Q3KL,
+    Q4KS,
+    Q4KM,
+    Q5KS,
+    Q5KM,
+    Q6K
 }
 
 
@@ -86,29 +86,26 @@ macro_rules! impl_quant_view {
 impl<'a> TensorView<'a> {
     pub fn elements_size(&self) -> usize {
         match self.dtype {
-            TensorDType::F32       => 4,
-            TensorDType::F16       => 2,
-            TensorDType::I8        => 1,
+            TensorDType::F32    => 4,
+            TensorDType::F16    => 2,
+            TensorDType::I8     => 1,
 
             // Packed quant types—all addressable in 1 byte.
-            TensorDType::Q4_0   |
-            TensorDType::Q4_1   |
-            TensorDType::Q5_0   |
-            TensorDType::Q5_1   |
-            TensorDType::Q8_0   |
-            TensorDType::Q8_1   |
-            TensorDType::Q2_K   |
-            TensorDType::Q3_K_S |
-            TensorDType::Q3_K_M |
-            TensorDType::Q3_K_L |
-            TensorDType::Q4_K_S |
-            TensorDType::Q4_K_M |
-            TensorDType::Q5_K_S |
-            TensorDType::Q5_K_M |
-            TensorDType::Q6_K     => 1,
-
-            // In case you add new types later
-            _ => panic!("Unsupported TensorDType: {:?}", self.dtype),
+            TensorDType::Q4_0   => 1,
+            TensorDType::Q4_1   => 1,
+            TensorDType::Q5_0   => 1,
+            TensorDType::Q5_1   => 1,
+            TensorDType::Q8_0   => 1,
+            TensorDType::Q8_1   => 1, 
+            TensorDType::Q2K   => 1,
+            TensorDType::Q3KS => 1, 
+            TensorDType::Q3KM => 1, 
+            TensorDType::Q3KL => 1, 
+            TensorDType::Q4KS => 1, 
+            TensorDType::Q4KM => 1, 
+            TensorDType::Q5KS => 1, 
+            TensorDType::Q5KM => 1, 
+            TensorDType::Q6K   => 1,
         }
     }
 
@@ -152,14 +149,14 @@ impl<'a> TensorView<'a> {
     impl_quant_view!(as_q5_1_slice, Q5_1);
     impl_quant_view!(as_q8_0_slice, Q8_0);
     impl_quant_view!(as_q8_1_slice, Q8_1);
-    impl_quant_view!(as_q2_k_slice, Q2_K);
-    impl_quant_view!(as_q3_k_s_slice, Q3_K_S);
-    impl_quant_view!(as_q3_k_m_slice, Q3_K_M);
-    impl_quant_view!(as_q3_k_l_slice, Q3_K_L);
-    impl_quant_view!(as_q4_k_s_slice, Q4_K_S);
-    impl_quant_view!(as_q4_k_m_slice, Q4_K_M);
-    impl_quant_view!(as_q5_k_s_slice, Q5_K_S);
-    impl_quant_view!(as_q5_k_m_slice, Q5_K_M);
-    impl_quant_view!(as_q6_k_slice, Q6_K);
+    impl_quant_view!(as_q2_k_slice, Q2K);
+    impl_quant_view!(as_q3_k_s_slice, Q3KS);
+    impl_quant_view!(as_q3_k_m_slice, Q3KM);
+    impl_quant_view!(as_q3_k_l_slice, Q3KL);
+    impl_quant_view!(as_q4_k_s_slice, Q4KS);
+    impl_quant_view!(as_q4_k_m_slice, Q4KM);
+    impl_quant_view!(as_q5_k_s_slice, Q5KS);
+    impl_quant_view!(as_q5_k_m_slice, Q5KM);
+    impl_quant_view!(as_q6_k_slice, Q6K);
 }
 

@@ -1,4 +1,4 @@
-mod cli_commands;
+mod cli;
 
 use std::fmt::format;
 use std::{collections::HashMap, fs::File, hash::Hash};
@@ -13,13 +13,14 @@ use clap::Parser;
 use log::debug;
 use std::io::{Cursor, Read};
 use std::fmt::Display;
-use crate::cli_commands::DumpFormat;
 use serde_json::json;
 use clap::CommandFactory;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use std::io::{BufWriter, Write};
- use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::IntoParallelRefIterator;
+use crate::legacy_main::cli_commands::DumpFormat;
+
 
 #[macro_export]
 macro_rules! check_debug_dev_sanity {
@@ -912,7 +913,7 @@ fn compat_tensor_dump(gguf: &ParsedGGUF) -> Result<()> {
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> 
+fn __main() -> anyhow::Result<()> 
 {
     env_logger::init();
     println!("main");

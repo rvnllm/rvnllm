@@ -1,12 +1,5 @@
 use clap::{Parser, Subcommand, Args, ValueEnum};
-use std::collections::HashMap;
-use std::io::Cursor;
 use std::path::PathBuf;
-use anyhow::{Result, bail};
-use memmap2::Mmap;
-use once_cell::sync::Lazy;
-use byteorder::{LittleEndian, ReadBytesExt};
-use serde_json::json;
 
 
 #[derive(Parser)]
@@ -121,6 +114,18 @@ pub enum Command {
         #[arg(long)]
         compat: bool, // <-- Add this
     },   
+
+    #[command(about = "Truncate GGUF file for development/testing purposes.")]
+    Truncate {
+        #[arg(long)]
+        file: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, default_value = "1")]
+        layers: usize,
+        #[arg(long, default_value_t = false)]
+        verbose: bool,
+    },
 
     #[command(about = "Analyze tensor structures and usage heuristics. (Note: under development)")]
     Analyze {
