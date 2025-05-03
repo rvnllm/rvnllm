@@ -1,8 +1,4 @@
-use ctensor::tensor_view::{
-    TensorView, 
-//    TensorDType
-};
-
+use ctensor::tensor_view::TensorView;
 
 pub fn _gelu(x: f32) -> f32 {
     let c = (2.0 / std::f32::consts::PI).sqrt();
@@ -25,6 +21,8 @@ pub fn gelu(input: &TensorView, output: &mut [f32]) -> anyhow::Result<()> {
 
 #[test]
 fn test_gelu_simple() {
+    use ctensor::tensor_view::TensorDType;
+    
     println!("[TEST] test_gelu_simple");
 
     let input_data = vec![-1.0f32, 0.0, 1.0];
