@@ -88,7 +88,7 @@ pub fn dispatch(cli: RvnCli) -> anyhow::Result<()>
         }
 
         Command::Truncate { file, output, layers, verbose } => {
-            run_truncate(file, output, layers, verbose);
+            let _r = run_truncate(file, output, layers, verbose);
         }
 
         Command::DecodeTest { 
