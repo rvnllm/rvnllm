@@ -1,12 +1,5 @@
 use clap::{Parser, Subcommand, Args, ValueEnum};
-use std::collections::HashMap;
-use std::io::Cursor;
 use std::path::PathBuf;
-use anyhow::{Result, bail};
-use memmap2::Mmap;
-use once_cell::sync::Lazy;
-use byteorder::{LittleEndian, ReadBytesExt};
-use serde_json::json;
 
 
 #[derive(Parser)]

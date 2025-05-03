@@ -15,7 +15,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 struct GgufHeader {
     magic: u32,
-    version: u32, //--->>> maybe later, just v3 for now
+    //version: u32, //--->>> maybe later, just v3 for now
     tensor_count: u64,
     metadata_kv_count: u64,
 }
@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
     // Step 2: Parse GGUF header
     let header = GgufHeader {
         magic: cursor.read_u32::<LittleEndian>()?,
-        version: cursor.read_u32::<LittleEndian>()?,
+        //_version: cursor.read_u32::<LittleEndian>()?,
         tensor_count: cursor.read_u64::<LittleEndian>()?,
         metadata_kv_count: cursor.read_u64::<LittleEndian>()?,
     };
