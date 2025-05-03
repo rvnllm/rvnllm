@@ -1,13 +1,14 @@
 use log::info;
-use std::collections::HashMap;
-use anyhow::{bail, anyhow, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use memmap2::Mmap;
 use std::path::Path;
 use once_cell::sync::{Lazy, OnceCell};
-use crate::types::{Value, MetadataValueType} ; 
+use crate::types::{Value, GgufVersion, GGMLType}; 
 use ctensor::tensor_view::{TensorView, TensorDType};
 use log::debug;
-
+use std::io::{Cursor, Read};
+use byteorder::{LittleEndian, ReadBytesExt};
+use std::{collections::HashMap, fs::File, hash::Hash};
 
 /****************************
  * Tensor Formats -> aka what quantization format are we talking 
@@ -19,6 +20,152 @@ use log::debug;
  * Q40 is working
  * Todo: Full qunatization support. Sprint 2 day 4-5 
  */
+/*******************************************
+ * Parser
+ */
+static PARSER_REGISTRY: Lazy<Vec<Box<dyn GgufParser>>> = Lazy::new(|| {
+    vec![
+        // ..... praser V! is missin
+
+        Box::new(ParserV2),
+        Box::new(ParserV3),
+        // ..... fture parsers
+    ]
+});
+
+struct GgufBody {
+    pub header: Header,
+    pub metadata: HashMap<String, Value>, // now typed values
+    pub tensors: HashMap<String, Tensor>,
+}
+
+
+// Look up the right parser for this on-disk GGUF version.
+fn parser_for(version: GgufVersion) -> Option<&'static Box<dyn GgufParser>> {
+    PARSER_REGISTRY
+        .iter()
+        .find(|parser| parser.version() == version)
+}
+
+pub fn parse_metadata_common(cursor: &mut Cursor<&[u8]>, metadata_kv_count: u64) -> Result<HashMap<String, Value>> {
+    let mut metadata = HashMap::new();
+    for _ in 0..metadata_kv_count {
+        let key = read_string(cursor)?;
+        let val = read_value(cursor)?;
+        //debug!("key: {:#?} {:#?}", key, val);
+        metadata.insert(key, val);
+    }
+    Ok(metadata)
+}
+
+pub fn parse_tensors_common(cursor: &mut Cursor<&[u8]>, tensor_count: u64) -> Result<HashMap<String, Tensor>> {
+    let mut tensors: HashMap<String, Tensor> = HashMap::new();
+    for _ in 0..tensor_count {
+    
+        // 1) name
+        let name = read_string(cursor)?;
+    
+        // 2) dims and shape
+        let dims = cursor.read_u32::<LittleEndian>()? as usize;
+        let mut shape = Vec::with_capacity(dims);
+        for _ in 0..dims {
+            shape.push(cursor.read_u64::<LittleEndian>()?);
+        }
+    
+        // 3) kind, offset
+        let kind = cursor.read_u32::<LittleEndian>()?;
+        let offset = cursor.read_u64::<LittleEndian>()?;
+    
+        // 4) infer type size via GGMLType or block_size logic
+        let block_size = match kind {
+            k if k < 2 => 1,
+            k if k < 10 => 32,
+            _ => 256,
+        };
+        let ggml_type: GGMLType = kind.try_into()?;
+        let type_size = match ggml_type {
+            GGMLType::F32 => 4,
+            GGMLType::F16 => 2,
+            GGMLType::Q4_0 => 2 + block_size/2,
+            GGMLType::Q4_1 => 2 + 2 + block_size/2,
+            GGMLType::Q5_0 => 2 + 4 + block_size/2,
+            GGMLType::Q5_1 => 2 + 2 + 4 + block_size/2,
+            GGMLType::Q8_0 => 2 + block_size,
+            GGMLType::Q8_1 => 4 + 4 + block_size,
+            GGMLType::Q2K => block_size/16 + block_size/4 + 2 + 2,
+            GGMLType::Q3K => block_size/8 + block_size/4 + 12 + 2,
+            GGMLType::Q4K => 2 + 2 + 12 + block_size/2,
+            GGMLType::Q5K => 2 + 2 + 12 + block_size/8 + block_size/2,
+            GGMLType::Q6K => block_size/2 + block_size/4 + block_size/16 + 2,
+            _ => return Err(anyhow!("unsupported GGMLType {:?}", ggml_type)),
+        };
+        let parameters: u64 = shape.iter().product();
+        let size = parameters * type_size as u64 / block_size as u64;
+        let tensor = Tensor { name: name.clone(), kind, offset, size, shape };
+        debug!("[DEBUG] tensors hell yeah: {:#?}", tensor);
+
+        tensors.insert(name, tensor);
+    }
+    Ok(tensors)
+}
+
+trait GgufParser: Send + Sync {
+    fn version(&self) -> GgufVersion;
+    fn parse<'b>(&self, cur: &mut Cursor<&'b [u8]>)-> Result<GgufBody>;
+}
+struct ParserV3;
+impl GgufParser for ParserV3 {
+    fn version(&self) -> GgufVersion { GgufVersion::V3 } // todo: move this an enum, no hardcoded magic symbols
+
+    fn parse<'b>(&self, cursor: &mut Cursor<&'b [u8]>) -> Result<GgufBody> {
+        let tensor_count = cursor.read_u64::<LittleEndian>()?;
+        debug!("tensor_count: {}", tensor_count);
+        let metadata_kv_count = cursor.read_u64::<LittleEndian>()?;
+        debug!("metadata_kv_count: {:#?}", metadata_kv_count);
+
+        let metadata = parse_metadata_common(cursor, metadata_kv_count)?;
+        let tensors = parse_tensors_common(cursor,tensor_count)?;
+ 
+        Ok(GgufBody {
+            header: Header {
+                tensor_count,
+                metadata_kv_count,
+            },
+            metadata,
+            tensors,
+        })
+    }
+}
+
+struct ParserV2;
+impl GgufParser for ParserV2 {
+    fn version(&self) -> GgufVersion { 
+        GgufVersion::V2
+    } // todo: move this an enum, no hardcoded magic symbols
+    fn parse<'b>(&self, cursor: &mut Cursor<&'b [u8]>) -> Result<GgufBody> {
+        let tensor_count = cursor.read_u64::<LittleEndian>()?;
+        debug!("tensor_count: {:#?}", tensor_count);
+        let metadata_kv_count = cursor.read_u64::<LittleEndian>()?;
+        debug!("metadata_kv_count: {:#?}", metadata_kv_count);
+
+        let metadata = parse_metadata_common(cursor, metadata_kv_count)?;
+        let tensors = parse_tensors_common(cursor,tensor_count)?;
+        // parse V2 tensor descriptors into `tensors`
+    
+        Ok(GgufBody {
+            header: Header { tensor_count, metadata_kv_count },
+            metadata,
+            tensors,
+        })
+    }
+}
+
+
+
+
+
+
+
 pub trait TensorFormat: Send + Sync {
     fn id(&self) -> u32;
     fn name(&self) -> &'static str;
@@ -354,16 +501,69 @@ impl ParsedGGUF {
 
 pub fn load_model<P: AsRef<Path>>(path: P) -> anyhow::Result<ParsedGGUF>
 {
-    info!("[DEBUg] Loading model {:#?}", path.as_ref().display());
+    info!("[DEBUG] Loading model {:#?}", path.as_ref().display());
 
+    // register the file formats F32 and quantized 
+    // 1. load quantization types
     register_tensor_registry_formats();
 
-    let parsed = ParsedGGUF {
-        header: Header::default(),
-        metadata: HashMap::new(),
-        tensors: HashMap::new(),
-        mmap,
-    };
+    // debug block, need to factor this one of here
+    // 2. instantiate registry
+    debug!("[DEBUG] fn: {:#?}", "load_model");
+    if let Some(map) = TENSOR_REGISTRY.get() {
+    debug!("[DEBUG] Registered tensor formats:");
+    for (k, v) in map {
+        debug!("[DEBUG] Kind: {} -> {}", k, v.name());
+    }
+    } else {
+        debug!("[DEBUG] TENSOR_REGISTRY is not initialized.");
+    }
+
+    // 3. build memory backend, open & mmap
+    let file = File::open(&path)
+        .with_context(|| format!("cannot open '{}'", path.as_ref().display()))?;
     
-    Ok(parsed)
+    let mmap = unsafe { Mmap::map(&file) }
+        .with_context(|| format!("cannot mmap '{}'", path.as_ref().display()))?;
+    
+    debug!("[DEBUG] MMAP created: len = {}", mmap.len());
+
+    // 4. Read  magic & version
+    let mut cursor = Cursor::new(&mmap[..]);
+    debug!("[DEBUG] Cursor position: {}", cursor.position());
+    debug!("[DEBUG] Cursor peek: {:?}", &mmap[0..16.min(mmap.len())]); // show header bytes
+    const MAGIC: u32 = 0x4655_4747;  //gguf
+    let magic = cursor.read_u32::<LittleEndian>()?;
+    if magic != MAGIC { bail!("[ERROR] invalid GGUF magic 0x{magic:08X}"); }  // todo: check magic command for the validity checks
+    let version_num = cursor.read_u32::<LittleEndian>()?;
+    let version = GgufVersion::try_from(version_num)?;
+    
+    
+    debug!("Version: {:#?}", version);
+
+    // 5. parse body -> retrive specific parser based in version and type
+    // check available parsers
+    debug!("[DEBUG] Looking up parser for version {:#?}", version);
+    for p in &*PARSER_REGISTRY {
+        debug!("[DEBUG] Registered parser version: {:#?}", p.version());
+    }
+
+    // get the parser
+    let parser = parser_for(version).ok_or_else(|| {
+        debug!("No parser found for version {:#?}", version);
+        anyhow!("unsupported GGUF version {:#?}", version)
+    })?;
+
+    debug!("Parser: {:#?}", parser.version());
+
+    // unchanged up to parsing
+    let mut body = parser.parse(&mut cursor)?;
+
+    Ok(
+        ParsedGGUF { 
+            header: body.header, 
+            metadata: body.metadata, 
+            tensors: body.tensors, 
+            mmap 
+    })
 }

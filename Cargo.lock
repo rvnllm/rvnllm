@@ -293,6 +293,7 @@ name = "parsers"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "byteorder",
  "ctensor",
  "log",
  "memmap2",
