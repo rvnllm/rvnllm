@@ -3,12 +3,12 @@ use anyhow::{anyhow, bail, Context, Result};
 use memmap2::Mmap;
 use std::path::Path;
 use once_cell::sync::{Lazy, OnceCell};
-use crate::types::{Value, GgufVersion, GGMLType}; 
+use crate::types::{Value, GgufVersion, GGMLType, MetadataValueType}; 
 use ctensor::tensor_view::{TensorView, TensorDType};
 use log::debug;
 use std::io::{Cursor, Read};
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::{collections::HashMap, fs::File, hash::Hash};
+use std::{collections::HashMap, fs::File};
 
 /****************************
  * Tensor Formats -> aka what quantization format are we talking 
@@ -40,6 +40,8 @@ struct GgufBody {
 }
 
 
+//////////////////////////////////////////////////////////////////////////////////
+/// Helper functions -->> todo: factor them out to make the file shorter
 // Look up the right parser for this on-disk GGUF version.
 fn parser_for(version: GgufVersion) -> Option<&'static Box<dyn GgufParser>> {
     PARSER_REGISTRY
@@ -108,6 +110,67 @@ pub fn parse_tensors_common(cursor: &mut Cursor<&[u8]>, tensor_count: u64) -> Re
     }
     Ok(tensors)
 }
+
+
+/// Read a length-prefixed UTF-8 string (u64 length)
+fn read_string(cursor: &mut Cursor<&[u8]>) -> Result<String> {
+    let len = cursor.read_u64::<LittleEndian>()?;
+    let mut buf = vec![0u8; len as usize];
+    cursor.read_exact(&mut buf)?;
+    Ok(String::from_utf8(buf)?)
+}
+
+/// Read a metadata value (primitive or recursively for arrays)
+fn read_value(cursor: &mut Cursor<&[u8]>) -> Result<Value> {
+    let val_type: MetadataValueType = cursor.read_u32::<LittleEndian>()?.try_into()?;
+    //    let val = read_metadata_val(&mut cursor);
+    let val = match val_type {
+        MetadataValueType::Uint8 => Value::Uint8(cursor.read_u8()?),
+        MetadataValueType::Int8 => Value::Int8(cursor.read_i8()?),
+        MetadataValueType::Uint16 => Value::Uint16(cursor.read_u16::<LittleEndian>()?),
+        MetadataValueType::Int16 => Value::Int16(cursor.read_i16::<LittleEndian>()?),
+        MetadataValueType::Uint32 => Value::Uint32(cursor.read_u32::<LittleEndian>()?),
+        MetadataValueType::Int32 => Value::Int32(cursor.read_i32::<LittleEndian>()?),
+        MetadataValueType::Float32 => Value::Float32(cursor.read_f32::<LittleEndian>()?),
+        MetadataValueType::Bool => Value::Bool(cursor.read_u8()? == 1),
+        MetadataValueType::String => Value::String(read_string(cursor)?),
+        MetadataValueType::Array => {
+            // Recursive handling!
+            let inner_elem_type: MetadataValueType = cursor.read_u32::<LittleEndian>()?.try_into()?;
+            let inner_array_len = cursor.read_u64::<LittleEndian>()?;
+            //  println!("[DEBUG] inner_array_len: {:#?}", inner_array_len);
+            let mut inner_arr = Vec::new();
+            for _ in 0..inner_array_len {
+                // Recursive call: match on inner_elem_type again
+                let inner_item = match inner_elem_type {
+                    MetadataValueType::Uint8 => Value::Uint8(cursor.read_u8()?),
+                    MetadataValueType::Int8 => Value::Int8(cursor.read_i8()?),
+                    MetadataValueType::Uint16 => Value::Uint16(cursor.read_u16::<LittleEndian>()?),
+                    MetadataValueType::Int16 => Value::Int16(cursor.read_i16::<LittleEndian>()?),
+                    MetadataValueType::Uint32 => Value::Uint32(cursor.read_u32::<LittleEndian>()?),
+                    MetadataValueType::Int32 => Value::Int32(cursor.read_i32::<LittleEndian>()?),
+                    MetadataValueType::Float32 => Value::Float32(cursor.read_f32::<LittleEndian>()?),
+                    MetadataValueType::Bool => Value::Bool(cursor.read_u8()? != 0),
+                    MetadataValueType::String => Value::String(read_string(cursor)?),
+                    MetadataValueType::Uint64 => Value::Uint64(cursor.read_u64::<LittleEndian>()?),
+                    MetadataValueType::Int64 => Value::Int64(cursor.read_i64::<LittleEndian>()?),
+                    MetadataValueType::Float64 => Value::Float64(cursor.read_f64::<LittleEndian>()?),
+                    _ => return Err(anyhow!("[ERROR] unsupported nested array element")),
+                };    
+                inner_arr.push(inner_item);
+            }
+            Value::Array(inner_arr)
+        },
+        MetadataValueType::Uint64 => Value::Uint64(cursor.read_u64::<LittleEndian>()?),
+        MetadataValueType::Int64 => Value::Int64(cursor.read_i64::<LittleEndian>()?),
+        MetadataValueType::Float64 => Value::Float64(cursor.read_f64::<LittleEndian>()?),
+    };
+    
+
+    Ok(val)
+}
+///// end of helper functions -> todo: factor them out into a separate file later
+/////////////////////////////////////////////////////////////////////////////////
 
 trait GgufParser: Send + Sync {
     fn version(&self) -> GgufVersion;
@@ -341,7 +404,7 @@ impl TensorFormat for Q3KMFormat {
     fn name(&self) -> &'static str{ "Q3_K_M" }
     fn decode<'a>(&self, bytes: &'a [u8], shape: &[usize]) -> Result<TensorView<'a>> {
         // TODO: proper quantisied code CPU or CUDA --->>> call kernel
-        Ok(TensorView { data: bytes, shape: shape.to_vec(), dtype: TensorDType::Q3_K_M })
+        Ok(TensorView { data: bytes, shape: shape.to_vec(), dtype: TensorDType::Q3KM})
     }
 }
 
@@ -355,7 +418,7 @@ pub fn decode_q2k_cpu(raw: &[u8], shape: &[usize]) -> Vec<f32> {
         let zero_pt  = u32::from_le_bytes(block[4..8].try_into().unwrap()) as f32;
         let data     = &block[8..12];
         // unpack 8 values per byte
-        for (i, &byte) in data.iter().enumerate() {
+        for (_, &byte) in data.iter().enumerate() {
             for bit in 0..8 {
                 let v2 = (byte >> (bit*2)) & 0x03;
                 // dequant: (v2 - zero_pt) * scale
@@ -404,7 +467,7 @@ impl TensorFormat for Q6KFormat {
     fn name(&self) -> &'static str{ "Q2_K" }
     fn decode<'a>(&self, bytes: &'a [u8], shape: &[usize]) -> Result<TensorView<'a>> {
         // TODO: proper quantisied code CPU or CUDA --->>> call kernel
-        Ok(TensorView { data: bytes, shape: shape.to_vec(), dtype: TensorDType::Q6_K })
+        Ok(TensorView { data: bytes, shape: shape.to_vec(), dtype: TensorDType::Q6K })
     }
 }
 
@@ -557,7 +620,7 @@ pub fn load_model<P: AsRef<Path>>(path: P) -> anyhow::Result<ParsedGGUF>
     debug!("Parser: {:#?}", parser.version());
 
     // unchanged up to parsing
-    let mut body = parser.parse(&mut cursor)?;
+    let body = parser.parse(&mut cursor)?;
 
     Ok(
         ParsedGGUF { 

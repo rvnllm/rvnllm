@@ -13,6 +13,7 @@ log = { workspace = true }
 memmap2 = { workspace = true }
 once_cell = { workspace = true } 
 byteorder = { workspace = true }
+bytemuck = { workspace = true }
 #
 ctensor = { path = "../ctensor" }
 
