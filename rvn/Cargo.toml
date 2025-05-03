@@ -15,6 +15,6 @@ serde_json = { workspace = true }
 byteorder = { workspace = true }
 memmap2 = { workspace = true }
 once_cell = { workspace = true }
-#
-rvnllm = { path = "../rvnllm" }
+
+parsers = { path = "../parsers" }
 

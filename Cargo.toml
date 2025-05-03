@@ -4,8 +4,9 @@
 [workspace]
 members = [ 
     "compute", 
-    "ctensor", "rvn",
-    "rvnllm",
+    "ctensor", 
+    "parsers", 
+    "rvn",
     "utils/gguf_loader",
 ]
 
