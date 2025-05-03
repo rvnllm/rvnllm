@@ -9,3 +9,9 @@ repository.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+log = { workspace = true }
+memmap2 = { workspace = true }
+once_cell = { workspace = true } 
+#
+ctensor = { path = "../ctensor" }
+

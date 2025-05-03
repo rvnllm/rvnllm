@@ -293,6 +293,10 @@ name = "parsers"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "ctensor",
+ "log",
+ "memmap2",
+ "once_cell",
 ]
 
 [[package]]
