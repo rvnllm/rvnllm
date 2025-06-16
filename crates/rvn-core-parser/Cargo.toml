@@ -1,0 +1,20 @@
+[package]
+name = "rvn-core-parser"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+memmap2 = { workspace = true }
+log = { workspace = true }
+serde_json = { workspace = true }
+rvn-core-tensor = { path = "../rvn-core-tensor" }
+byteorder = { workspace = true }
+once_cell = { workspace = true }
