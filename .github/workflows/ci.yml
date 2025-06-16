@@ -1,4 +1,4 @@
-name: rvn-convert CI
+name: rvn-info CI      # <- new title makes the badge clearer
 
 on:
   push:
@@ -13,14 +13,14 @@ jobs:
   test:
     name: Build and Test
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-      
+
     - name: Debug test environment
       run: |
         rustc --version
@@ -29,10 +29,13 @@ jobs:
 
     - name: Run CI checks
       run: make ci
-      
-    - name: Test binaries exist and run
-      run: |
-        ls -la target/debug/rvn-convert
-        ./target/debug/rvn-convert --help
 
+    # ---- changed section ----
+    - name: Build rvn-info
+      run: cargo build --bin rvn-info --all-features   # or --workspace --bins
+
+    - name: Smoke-test binary
+      run: |
+        test -x target/debug/rvn-info           # ensure it really built
+        cargo run --bin rvn-info -- --help      # or --info, --version, whatever
 
