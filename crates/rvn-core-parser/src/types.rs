@@ -1,6 +1,6 @@
-use std::fmt::Display;
 use anyhow::Result;
 use anyhow::anyhow;
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -111,8 +111,6 @@ impl TryFrom<u32> for GGMLType {
     }
 }
 
-
-
 impl TryFrom<u32> for MetadataValueType {
     type Error = anyhow::Error;
     fn try_from(v: u32) -> Result<Self> {
@@ -134,4 +132,3 @@ impl TryFrom<u32> for MetadataValueType {
         }
     }
 }
-

@@ -9,7 +9,7 @@ use rvn_globals::{GlobalOpts, get_globals, init_globals};
 pub async fn run_info_cmd(cmd: InfoArgs, _globals: &GlobalOpts) -> anyhow::Result<()> {
     debug!("rvn-info::header");
     debug!("rvn-info file: {:#?}", &cmd.file);
-    
+
     let gguf = load_model(&cmd.file)?;
     if cmd.header {
         println!("Header: {:?}", gguf.header);
@@ -29,7 +29,6 @@ pub async fn run_info_cmd(cmd: InfoArgs, _globals: &GlobalOpts) -> anyhow::Resul
                 _ => println!("  {}: {:?}", k, v),
             }
         }
-
     }
 
     Ok(())
