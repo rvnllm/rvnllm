@@ -15,10 +15,10 @@ pub async fn run_info_cmd(cmd: InfoArgs, globals: &GlobalOpts) -> anyhow::Result
 
     // pretty
     if globals.format == OutputFormat::Pretty {
-        if cmd.header {
+        if cmd.wants_header() {
             println!("Header: {:?}", gguf.header);
         }
-        if cmd.metadata {
+        if cmd.wants_metadata() {
             println!("Metadata:");
             for (k, v) in gguf.metadata() {
                 if let Some(key) = k.strip_prefix("tokenizer") {
@@ -34,7 +34,7 @@ pub async fn run_info_cmd(cmd: InfoArgs, globals: &GlobalOpts) -> anyhow::Result
                 }
             }
         }
-        if cmd.tensors {
+        if cmd.wants_tensors() {
             for (name, t) in gguf.iter() {
                 println!("{name}: shape={:?}, dtype={:?}", t.shape, t.kind);
             }

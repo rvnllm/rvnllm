@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use serde::Serialize;
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Value {
     Uint8(u8),
     Int8(i8),

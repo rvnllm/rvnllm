@@ -1,14 +1,6 @@
 use serde::Serialize;
 use smallvec::SmallVec;
 
-#[derive(Debug, Serialize)]
-pub struct Tensor {
-    pub name: String,
-    pub kind: u32,
-    pub size: u64,
-    pub shape: Vec<u64>,
-}
-
 pub type ShapeBuf = SmallVec<[u64; 6]>;
 
 #[derive(Debug, Default, Serialize)]

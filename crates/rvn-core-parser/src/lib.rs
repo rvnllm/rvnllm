@@ -5,12 +5,39 @@ use anyhow::{Context, Result, anyhow, bail};
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::debug;
 use memmap2::Mmap;
-use rvn_core_tensor::Tensor;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::Path;
+
+#[derive(Serialize)]
+pub struct DiffDump<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header: Option<Vec<(&'static str, (&'a u64, &'a u64))>>, // (field,(a,b))
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<MetaDiff<'a>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tensors: Option<TensorDiff<'a>>,
+}
+
+#[derive(Serialize)]
+pub struct MetaDiff<'a> {
+    pub added: Vec<(&'a str, &'a Value)>,
+    pub removed: Vec<(&'a str, &'a Value)>,
+    pub changed: Vec<(&'a str, (&'a Value, &'a Value))>,
+}
+
+#[derive(Serialize)]
+pub struct TensorDiff<'a> {
+    pub added: Vec<(&'a str, &'a Tensor)>,
+    pub removed: Vec<(&'a str, &'a Tensor)>,
+    // Only shape / dtype mismatch; value-level diff would melt CPUs
+    pub changed: Vec<(&'a str, (&'a Tensor, &'a Tensor))>,
+}
 
 #[derive(Serialize)]
 pub struct InfoDump<'a> {
@@ -92,6 +119,45 @@ static V2: ParserV2 = ParserV2;
 static V3: ParserV3 = ParserV3;
 
 static PARSER_REGISTRY: &[&dyn GgufParser] = &[&V2, &V3];
+
+#[derive(Debug, Serialize)]
+pub struct Tensor {
+    pub name: String,
+    pub kind: TensorKind,
+    pub size: u64,
+    pub shape: Vec<u64>,
+}
+
+#[repr(u32)] // keeps the on-disk value the same
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Serialize)]
+pub enum TensorKind {
+    F32 = 0,
+    F16 = 1,
+    I8 = 2,
+    // add more as needed
+}
+impl TryFrom<u32> for TensorKind {
+    type Error = anyhow::Error;
+
+    fn try_from(v: u32) -> Result<Self, Self::Error> {
+        match v {
+            0 => Ok(TensorKind::F32),
+            1 => Ok(TensorKind::F16),
+            2 => Ok(TensorKind::I8),
+            other => anyhow::bail!("unknown tensor kind {}", other),
+        }
+    }
+}
+impl fmt::Display for TensorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            TensorKind::F32 => "F32",
+            TensorKind::F16 => "F16",
+            TensorKind::I8 => "I8",
+        };
+        f.write_str(s)
+    }
+}
 
 fn parser_for(version: GgufVersion) -> Option<&'static dyn GgufParser> {
     PARSER_REGISTRY
@@ -247,16 +313,18 @@ pub fn parse_tensors_common(
         }
 
         // 3) kind, offset
-        let kind = cursor.read_u32::<LittleEndian>()?;
+        let kind_raw = cursor.read_u32::<LittleEndian>()?;
+        let kind = TensorKind::try_from(kind_raw)?;
+
         let _offset = cursor.read_u64::<LittleEndian>()?;
 
         // 4) infer type size via GGMLType or block_size logic
-        let block_size = match kind {
+        let block_size = match kind_raw {
             k if k < 2 => 1,
             k if k < 10 => 32,
             _ => 256,
         };
-        let ggml_type: GGMLType = kind.try_into()?;
+        let ggml_type: GGMLType = kind_raw.try_into()?;
         let type_size = match ggml_type {
             GGMLType::F32 => 4,
             GGMLType::F16 => 2,
