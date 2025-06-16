@@ -34,14 +34,13 @@ pub struct InfoArgs {
     /// Inspect one or more named tensors
     #[arg(long)]
     pub tensors: bool,
-
-    /// Load vocabulary from gguf file
-    #[arg(long)]
-    pub vocab: bool,
+    //  Load vocabulary from gguf file
+    //  #[arg(long)]
+    //  pub vocab: bool,
 }
 impl InfoArgs {
     fn none_specified(&self) -> bool {
-        !(self.header || self.metadata || self.tensors || self.vocab)
+        !(self.header || self.metadata || self.tensors) // || self.vocab)
     }
     pub fn wants_header(&self) -> bool {
         self.header || self.none_specified()
@@ -52,7 +51,8 @@ impl InfoArgs {
     pub fn wants_tensors(&self) -> bool {
         self.tensors || self.none_specified()
     }
-    pub fn wants_vocab(&self) -> bool {
-        self.vocab || self.none_specified()
-    }
+    // todo: grab the vocab from metadata?
+    //    pub fn wants_vocab(&self) -> bool {
+    //      self.vocab || self.none_specified()
+    //}
 }

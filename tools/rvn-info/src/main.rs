@@ -1,11 +1,10 @@
 mod cli;
-mod info;
 
 use crate::cli::{Cli, InfoArgs};
 use clap::Parser;
 use log::debug;
-use rvn_core_parser::{InfoDump, load_model, types::Value};
-use rvn_globals::{GlobalOpts, OutputFormat, get_globals, init_globals};
+use rvn_core_parser::{InfoDump, load_model};
+use rvn_globals::{GlobalOpts, OutputFormat, get_globals, init_globals, types::Value};
 
 pub async fn run_info_cmd(cmd: InfoArgs, globals: &GlobalOpts) -> anyhow::Result<()> {
     debug!("rvn-info::header");

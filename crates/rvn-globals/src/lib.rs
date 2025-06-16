@@ -1,3 +1,5 @@
+pub mod types;
+
 use clap::{Args, ValueEnum};
 use once_cell::sync::OnceCell;
 use std::path::PathBuf;

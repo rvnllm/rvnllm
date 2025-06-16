@@ -6,12 +6,14 @@ members = [
     "tools/rvn-info", 
     "crates/rvn-core-tensor", 
     "crates/rvn-core-parser",
-    "crates/rvn-globals", "crates/rvn-core-info", "crates/rvn-core-diff", 
+    "crates/rvn-globals", 
+    "crates/rvn-core-diff", 
+    "py/rvn_py", 
 ]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "OSS LLM tooling in rust"
 license = "MIT"
@@ -42,6 +44,9 @@ ctor = "0.4.2"
 tempfile = "3.20"
 serde_yaml  = "0.9"  
 owo-colors = "4.2.1"
+polars = { version = "0.48", features = ["lazy", "strings", "dtype-struct"] }
+pyo3 = { version = "0.24.2", features = ["extension-module"] }
+pyo3-polars = { version = "0.21" }
 
 [profile.mindebug-dev]
 inherits = "dev"

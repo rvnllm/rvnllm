@@ -11,3 +11,6 @@ categories.workspace = true
 authors.workspace = true
 
 [dependencies]
+rvn-core-tensor     = { path = "../../crates/rvn-core-tensor" }
+rvn-globals         = { path = "../../crates/rvn-globals" }
+

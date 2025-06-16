@@ -1,0 +1,25 @@
+[package]
+name = "rvn"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib"]   # needed for a Python extension
+
+[dependencies]
+pyo3                = { workspace = true }
+pyo3-polars         = { workspace = true }
+polars              = { workspace = true }
+rvn-core-parser     = { path = "../../crates/rvn-core-parser" }
+rvn-core-tensor     = { path = "../../crates/rvn-core-tensor" }
+rvn-core-diff       = { path = "../../crates/rvn-core-diff" }
+rvn-globals         = { path = "../../crates/rvn-globals" }
+
+

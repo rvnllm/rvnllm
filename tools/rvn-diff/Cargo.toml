@@ -11,16 +11,18 @@ categories.workspace = true
 authors.workspace = true
 
 [dependencies]
-rvn-core-parser = { path = "../../crates/rvn-core-parser" }
-rvn-core-tensor = { path = "../../crates/rvn-core-tensor" }
-rvn-globals = { path = "../../crates/rvn-globals" }
-clap = { workspace = true }
-anyhow = { workspace = true }
-env_logger = { workspace = true } 
-log = { workspace = true }
-tokio = { workspace = true }
-serde_json  = { workspace = true } 
-serde       = { workspace = true }
-serde_yaml  = { workspace = true }
-owo-colors  = { workspace = true }
+rvn-core-parser     = { path = "../../crates/rvn-core-parser" }
+rvn-core-tensor     = { path = "../../crates/rvn-core-tensor" }
+rvn-core-diff       = { path = "../../crates/rvn-core-diff" }
+rvn-globals         = { path = "../../crates/rvn-globals" }
+
+clap                = { workspace = true }
+anyhow              = { workspace = true }
+env_logger          = { workspace = true } 
+log                 = { workspace = true }
+tokio               = { workspace = true }
+serde_json          = { workspace = true } 
+serde               = { workspace = true }
+serde_yaml          = { workspace = true }
+owo-colors          = { workspace = true }
 
