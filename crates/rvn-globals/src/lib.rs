@@ -6,15 +6,6 @@ static INIT_SYNC: std::sync::Once = std::sync::Once::new();
 static GLOBAL_OPTS: OnceCell<GlobalOpts> = OnceCell::new();
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum, Debug)]
-pub enum Device {
-    Cpu,
-    #[value(alias = "gpu")]
-    Cuda,
-    #[value(alias = "m1", alias = "m2", alias = "m3", alias = "apple")]
-    Metal,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, ValueEnum, Debug)]
 pub enum OutputFormat {
     Pretty,
     Json,
@@ -37,10 +28,6 @@ pub struct GlobalOpts {
         global = true
     )]
     pub format: OutputFormat,
-
-    // Target device
-    #[arg(short = 'd', long, value_enum, default_value = "cpu", global = true)]
-    pub device: Device,
 
     #[arg(short = 't', long, help = "Number of threads (optional)")]
     pub threads: Option<usize>,

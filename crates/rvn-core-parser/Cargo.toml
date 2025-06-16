@@ -18,3 +18,4 @@ serde_json = { workspace = true }
 rvn-core-tensor = { path = "../rvn-core-tensor" }
 byteorder = { workspace = true }
 once_cell = { workspace = true }
+serde       = { workspace = true }

@@ -1,8 +1,9 @@
 use anyhow::Result;
 use anyhow::anyhow;
+use serde::Serialize;
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum Value {
     Uint8(u8),
     Int8(i8),

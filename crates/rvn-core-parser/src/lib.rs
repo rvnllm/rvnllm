@@ -6,12 +6,28 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use log::debug;
 use memmap2::Mmap;
 use rvn_core_tensor::Tensor;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::Path;
 
-#[derive(Default, Debug)]
+#[derive(Serialize)]
+pub struct InfoDump<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header: Option<&'a Header>,
+
+    //    #[serde(skip_serializing_if = "Option::is_none")]
+    //  pub metadata:  Option<&'a HashMap<String, Value>>,
+    // (key, value) pairs that survived the filter
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Vec<(&'a str, &'a Value)>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tensors: Option<Vec<(&'a str, &'a Tensor)>>, // nicer key type
+}
+
+#[derive(Default, Debug, Serialize)]
 pub struct ParsedGGUF {
     // public
     pub header: Header,
@@ -59,7 +75,7 @@ impl From<GgufVersion> for u32 {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct Header {
     pub tensor_count: u64,
     pub metadata_kv_count: u64,
