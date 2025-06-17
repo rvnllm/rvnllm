@@ -32,7 +32,7 @@ pip install rvnllm
 ```
 # Inspect a model
 iimport rvnllm
-]
+
 df = rvnllm.info("Llama-3-70B.Q4_0.gguf")
 print(df.head())
 
