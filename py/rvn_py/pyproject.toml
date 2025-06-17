@@ -2,3 +2,17 @@
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
+[project]
+name = "rvn"
+version = "0.1.2"
+description = "Lightning-fast LLM model introspection"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Ervin Bosenbacher", email = "ervin.bosenbacher@rvnllm.com" }]
+dependencies = [
+    "polars>=0.19"
+]  # Optional
+
+[tool.maturin]
+bindings = "pyo3"

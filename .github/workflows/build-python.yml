@@ -34,6 +34,6 @@ jobs:
       - name: Upload built wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels
-          path: dist/
+          wame: wheels-${{ runner.os }}
+          path: py/rvn_py/dist/
 
