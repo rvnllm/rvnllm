@@ -1,69 +1,119 @@
 use polars::prelude::*;
 use pyo3::prelude::*;
 use pyo3_polars::PyDataFrame;
-use rvn_core_diff::{diff_header, diff_tensors, diff_metadata};
-
+use rvn_core_diff::{diff_header, diff_metadata, diff_tensors};
 
 #[pyfunction]
 fn info(path: &str) -> PyResult<PyDataFrame> {
-    let gguf = rvn_core_parser::load_model(path)
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to load model: {e:?}")))?;
-    
+    let gguf = rvn_core_parser::load_model(path).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to load model: {e:?}"))
+    })?;
+
     // Extract comprehensive tensor information
     let tensor_names: Vec<&str> = gguf.tensors.keys().map(String::as_str).collect();
     let tensor_count = tensor_names.len();
-    
+
     let df = DataFrame::new(vec![
         Series::new("tensor".into(), tensor_names).into(),
-        Series::new("shape".into(), gguf.tensors.values().map(|t| format!("{:?}", t.shape)).collect::<Vec<_>>()).into(),
-        Series::new("dtype".into(), gguf.tensors.values().map(|t| t.kind.to_string()).collect::<Vec<_>>()).into(),
-        Series::new("n_dims".into(), gguf.tensors.values().map(|t| t.shape.len() as u32).collect::<Vec<_>>()).into(),
+        Series::new(
+            "shape".into(),
+            gguf.tensors
+                .values()
+                .map(|t| format!("{:?}", t.shape))
+                .collect::<Vec<_>>(),
+        )
+        .into(),
+        Series::new(
+            "dtype".into(),
+            gguf.tensors
+                .values()
+                .map(|t| t.kind.to_string())
+                .collect::<Vec<_>>(),
+        )
+        .into(),
+        Series::new(
+            "n_dims".into(),
+            gguf.tensors
+                .values()
+                .map(|t| t.shape.len() as u32)
+                .collect::<Vec<_>>(),
+        )
+        .into(),
         // Fix the product calculation by dereferencing
-        Series::new("n_elements".into(), gguf.tensors.values().map(|t| t.shape.iter().copied().product::<u64>()).collect::<Vec<_>>()).into(),
-        Series::new("size_bytes".into(), gguf.tensors.values().map(|t| {
-            let elem_count = t.shape.iter().copied().product::<u64>();
-            let elem_size = match t.kind.to_string().as_str() {
-                "F32" | "I32" | "U32" => 4,
-                "F64" | "I64" | "U64" => 8,
-                "F16" | "BF16" | "I16" | "U16" => 2,
-                "I8" | "U8" => 1,
-                "Q4_0" | "Q4_1" => elem_count / 2, // Rough estimate for quantized
-                "Q8_0" => elem_count,
-                _ => 4, // Default fallback
-            };
-            elem_count * elem_size
-        }).collect::<Vec<_>>()).into(),
+        Series::new(
+            "n_elements".into(),
+            gguf.tensors
+                .values()
+                .map(|t| t.shape.iter().copied().product::<u64>())
+                .collect::<Vec<_>>(),
+        )
+        .into(),
+        Series::new(
+            "size_bytes".into(),
+            gguf.tensors
+                .values()
+                .map(|t| {
+                    let elem_count = t.shape.iter().copied().product::<u64>();
+                    let elem_size = match t.kind.to_string().as_str() {
+                        "F32" | "I32" | "U32" => 4,
+                        "F64" | "I64" | "U64" => 8,
+                        "F16" | "BF16" | "I16" | "U16" => 2,
+                        "I8" | "U8" => 1,
+                        "Q4_0" | "Q4_1" => elem_count / 2, // Rough estimate for quantized
+                        "Q8_0" => elem_count,
+                        _ => 4, // Default fallback
+                    };
+                    elem_count * elem_size
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into(),
     ])
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create DataFrame: {e:?}")))?;
-    
-    let enriched_df = df.lazy()
+    .map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+            "Failed to create DataFrame: {e:?}"
+        ))
+    })?;
+
+    let enriched_df = df
+        .lazy()
         .with_columns([
             lit(tensor_count as u32).alias("total_tensors"),
             lit(path).alias("model_path"),
         ])
         .collect()
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to add metadata: {e:?}")))?;
-    
+        .map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to add metadata: {e:?}"
+            ))
+        })?;
+
     Ok(PyDataFrame(enriched_df))
 }
 
 #[pyfunction]
 fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
     let (a, b) = (
-        rvn_core_parser::load_model(path_a)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to load model A: {e:?}")))?,
-        rvn_core_parser::load_model(path_b)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to load model B: {e:?}")))?,
+        rvn_core_parser::load_model(path_a).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to load model A: {e:?}"
+            ))
+        })?,
+        rvn_core_parser::load_model(path_b).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to load model B: {e:?}"
+            ))
+        })?,
     );
-    
+
     let tensor_diff = diff_tensors(
         a.tensors.iter().map(|(n, t)| (n.as_str(), t)),
-        b.tensors.iter().map(|(n, t)| (n.as_str(), t))
+        b.tensors.iter().map(|(n, t)| (n.as_str(), t)),
     );
-    
+
     let header_diff = diff_header(&a.header, &b.header);
     let meta_diff = diff_metadata(&a.metadata, &b.metadata);
-    
+
     let mut all_changes = Vec::new();
     let mut change_types = Vec::new();
     let mut lhs_shapes = Vec::new();
@@ -72,7 +122,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
     let mut rhs_dtypes = Vec::new();
     let mut dtype_changed_flags = Vec::new();
     let mut shape_changed_flags = Vec::new();
-    
+
     if let Some(tdiff) = tensor_diff {
         // Process changed tensors
         for (name, (ta, tb)) in tdiff.changed.iter() {
@@ -85,7 +135,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
             dtype_changed_flags.push(ta.kind != tb.kind);
             shape_changed_flags.push(ta.shape != tb.shape);
         }
-        
+
         // Process added tensors
         for (name, tensor) in tdiff.added.iter() {
             all_changes.push(*name);
@@ -97,7 +147,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
             dtype_changed_flags.push(true);
             shape_changed_flags.push(true);
         }
-        
+
         // Process removed tensors
         for (name, tensor) in tdiff.removed.iter() {
             all_changes.push(*name);
@@ -110,7 +160,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
             shape_changed_flags.push(true);
         }
     }
-    
+
     // Add header differences
     if let Some(hdiff) = header_diff {
         for (field_name, (lhs_val, rhs_val)) in hdiff.iter() {
@@ -124,7 +174,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
             shape_changed_flags.push(false);
         }
     }
-    
+
     // Add metadata differences
     if let Some(mdiff) = meta_diff {
         // Changed metadata
@@ -138,7 +188,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
             dtype_changed_flags.push(true);
             shape_changed_flags.push(false);
         }
-        
+
         // Added metadata
         for (key, val) in mdiff.added.iter() {
             all_changes.push(key);
@@ -150,7 +200,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
             dtype_changed_flags.push(true);
             shape_changed_flags.push(false);
         }
-        
+
         // Removed metadata
         for (key, val) in mdiff.removed.iter() {
             all_changes.push(key);
@@ -163,12 +213,12 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
             shape_changed_flags.push(false);
         }
     }
-    
+
     // Count changes for metadata before moving the vector
     let n_added = change_types.iter().filter(|&ct| *ct == "added").count() as u32;
     let n_removed = change_types.iter().filter(|&ct| *ct == "removed").count() as u32;
     let n_changed = change_types.iter().filter(|&ct| *ct == "changed").count() as u32;
-    
+
     let df = DataFrame::new(vec![
         Series::new("tensor".into(), all_changes).into(),
         Series::new("change_type".into(), change_types).into(),
@@ -179,20 +229,29 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
         Series::new("dtype_changed".into(), dtype_changed_flags).into(),
         Series::new("shape_changed".into(), shape_changed_flags).into(),
     ])
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create diff DataFrame: {e:?}")))?;
-    
+    .map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+            "Failed to create diff DataFrame: {e:?}"
+        ))
+    })?;
+
     // Add summary statistics
-    let enriched_df = df.lazy()
+    let enriched_df = df
+        .lazy()
         .with_columns([
             lit(n_added).alias("n_added"),
-            lit(n_removed).alias("n_removed"), 
+            lit(n_removed).alias("n_removed"),
             lit(n_changed).alias("n_changed"),
             lit(path_a).alias("lhs_path"),
             lit(path_b).alias("rhs_path"),
         ])
         .collect()
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to add metadata: {e:?}")))?;
-    
+        .map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to add metadata: {e:?}"
+            ))
+        })?;
+
     Ok(PyDataFrame(enriched_df))
 }
 
