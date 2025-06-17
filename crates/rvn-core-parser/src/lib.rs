@@ -291,13 +291,13 @@ pub fn load_model<P: AsRef<Path>>(path: P) -> anyhow::Result<ParsedGGUF> {
     debug!("[DEBUG] Loading model {:#?}", path.as_ref().display());
 
     // 1) open & mmap
-//    let file =
-  //      File::open(&path).with_context(|| format!("cannot open '{}'", path.as_ref().display()))?;
- //   let mmap = unsafe { Mmap::map(&file) }
-   //     .with_context(|| format!("cannot mmap '{}'", path.as_ref().display()))?;
+    //    let file =
+    //      File::open(&path).with_context(|| format!("cannot open '{}'", path.as_ref().display()))?;
+    //   let mmap = unsafe { Mmap::map(&file) }
+    //     .with_context(|| format!("cannot mmap '{}'", path.as_ref().display()))?;
     // making windows happy
-    let file = File::open(&path)
-        .with_context(|| format!("cannot open '{}'", path.as_ref().display()))?;
+    let file =
+        File::open(&path).with_context(|| format!("cannot open '{}'", path.as_ref().display()))?;
     let mmap = unsafe { Mmap::map(&file) }
         .with_context(|| format!("cannot mmap '{}'", path.as_ref().display()))?;
     drop(file); // Windows won't lock the file into a hell dimension
