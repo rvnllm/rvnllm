@@ -1,5 +1,5 @@
 [package]
-name = "rvn"
+name = "rvnllm"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -12,6 +12,7 @@ authors.workspace = true
 
 [lib]
 crate-type = ["cdylib"]   # needed for a Python extension
+name       = "rvnllm" 
 
 [dependencies]
 pyo3                = { workspace = true }

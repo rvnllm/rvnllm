@@ -256,7 +256,7 @@ fn diff(path_a: &str, path_b: &str) -> PyResult<PyDataFrame> {
 }
 
 #[pymodule]
-fn rvn(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn rvnllm(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(info, m)?)?;
     m.add_function(wrap_pyfunction!(diff, m)?)?;
     Ok(())

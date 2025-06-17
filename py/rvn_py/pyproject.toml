@@ -3,8 +3,8 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "rvn"
-version = "0.1.7"
+name = "rvnllm"
+version = "0.1.11"
 description = "Lightning-fast LLM model introspection"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -16,3 +16,4 @@ dependencies = [
 
 [tool.maturin]
 bindings = "pyo3"
+name = "rvnllm"

@@ -2601,19 +2601,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a0d197bd2c9dc6e53b84da9556a69ba4cdfab8619eb41a8bd1cc2027a0f6b1d"
 
 [[package]]
-name = "rvn"
-version = "0.1.2"
-dependencies = [
- "polars",
- "pyo3",
- "pyo3-polars",
- "rvn-core-diff",
- "rvn-core-parser",
- "rvn-core-tensor",
- "rvn-globals",
-]
-
-[[package]]
 name = "rvn-core-diff"
 version = "0.1.2"
 dependencies = [
@@ -2693,6 +2680,19 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
+]
+
+[[package]]
+name = "rvnllm"
+version = "0.1.2"
+dependencies = [
+ "polars",
+ "pyo3",
+ "pyo3-polars",
+ "rvn-core-diff",
+ "rvn-core-parser",
+ "rvn-core-tensor",
+ "rvn-globals",
 ]
 
 [[package]]
