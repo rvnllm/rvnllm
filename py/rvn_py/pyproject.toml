@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "rvn"
-version = "0.1.6"
+version = "0.1.7"
 description = "Lightning-fast LLM model introspection"
 readme = "README.md"
 requires-python = ">=3.8"
