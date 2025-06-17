@@ -2,7 +2,6 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 [![Built with Rust](https://img.shields.io/badge/built%20with-rust-orange?logo=rust)](https://www.rust-lang.org/)
 [![PyPI version](https://img.shields.io/pypi/v/rvnllm?logo=pypi&label=PyPI)](https://pypi.org/project/rvnllm/)
-[![Python versions](https://img.shields.io/pypi/pyversions/rvnllm?logo=python)](https://pypi.org/project/rvnllm/)
 
 
 # rvnllm
