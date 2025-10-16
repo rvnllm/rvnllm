@@ -14,7 +14,7 @@ Nodes can think, act, and communicate — enabling flexible, composable AI syste
 
 ---
 
-## 🧠 Why rvnllm?
+## Why rvnllm?
 
 - **Modern C++ only** — built with GCC 15.2 and C++23 (with an eye on C++26 and C23).
 - **Rust-inspired design** — ownership, safety, and clarity over legacy cruft.
@@ -26,7 +26,7 @@ Nodes can think, act, and communicate — enabling flexible, composable AI syste
 
 ---
 
-## 🧰 Tech Stack
+## Tech Stack
 
 - **Languages:** Modern C++23 (C++26 features planned), Rust, Assembly  
 - **Compiler:** GCC 15.2+  
@@ -35,7 +35,7 @@ Nodes can think, act, and communicate — enabling flexible, composable AI syste
 
 ---
 
-## 📅 Roadmap (Day Zero)
+## Roadmap (Day Zero)
 
 - [ ] Project scaffolding and core build system  
 - [ ] Minimal runtime with graph execution skeleton  
@@ -49,7 +49,7 @@ Nodes can think, act, and communicate — enabling flexible, composable AI syste
 
 ---
 
-## 🐦 Philosophy
+## Philosophy
 
 Ravens are intelligent, adaptive, and thrive in the wild.  
 `rvnllm` aims to do the same: **lightweight**, **smart**, and **capable of working outside the cloud-comfort zone**.
@@ -60,7 +60,7 @@ Ravens are intelligent, adaptive, and thrive in the wild.
 
 ---
 
-## 🤝 Contributing (Eventually)
+## Contributing (Eventually)
 
 This project is still at its inception.  
 In the near future, contributions will be welcomed — but the design philosophy will stay *lean and ruthless*.
@@ -75,14 +75,14 @@ then you’ll fit right in.
 
 ---
 
-## 📜 License
+## License
 
 To be decided.  
 (Likely permissive — ravens don’t like cages.)
 
 ---
 
-## 🧭 Status
+## Status
 
 `rvnllm` is currently in **pre-alpha / day zero**.  
 Nothing works. Everything is possible.
