@@ -12,7 +12,6 @@ At its core, `rvnllm` is an **agentic execution engine**:
 Every ML model is a **node** in a dynamic computation graph.  
 Nodes can think, act, and communicate — enabling flexible, composable AI systems beyond monolithic inference.
 
----
 
 ## Why rvnllm?
 
@@ -23,8 +22,7 @@ Nodes can think, act, and communicate — enabling flexible, composable AI syste
 - **Bare-metal where it matters** — Assembly for low-level CPU interactions.
 - **Rust up top** — for orchestration, agents, and higher-level runtime.
 - **Language bindings** — Python and more, for developer flexibility.
-
----
+- 
 
 ## Tech Stack
 
@@ -33,7 +31,6 @@ Nodes can think, act, and communicate — enabling flexible, composable AI syste
 - **Primary Platform:** CPU-first (CUDA optional)  
 - **Bindings:** Python (initial), more to come
 
----
 
 ## Roadmap (Day Zero)
 
@@ -58,7 +55,6 @@ Ravens are intelligent, adaptive, and thrive in the wild.
 - Less “legacy,” more “clarity.”  
 - Less “magic,” more “intentional design.”
 
----
 
 ## Contributing (Eventually)
 
@@ -73,14 +69,12 @@ If you believe ML infrastructure should be:
 
 then you’ll fit right in.
 
----
 
 ## License
 
 To be decided.  
 (Likely permissive — ravens don’t like cages.)
 
----
 
 ## Status
 
