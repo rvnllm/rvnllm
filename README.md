@@ -22,7 +22,7 @@ Nodes can think, act, and communicate — enabling flexible, composable AI syste
 - **Bare-metal where it matters** — Assembly for low-level CPU interactions.
 - **Rust up top** — for orchestration, agents, and higher-level runtime.
 - **Language bindings** — Python and more, for developer flexibility.
-- 
+
 
 ## Tech Stack
 
